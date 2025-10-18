@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Stethoscope,
@@ -11,7 +11,6 @@ import {
   LogOut,
   Settings,
 } from 'lucide-react';
-
 import {
   SidebarProvider,
   Sidebar,
@@ -25,9 +24,10 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
-import { Button } from '@/components/ui/button';
 import { UserNav } from '@/components/user-nav';
-import { cn } from '@/lib/utils';
+import { useAuth, useUser } from '@/firebase';
+import { useEffect } from 'react';
+import { signOut } from 'firebase/auth';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -43,6 +43,28 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/');
+  };
+
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -79,11 +101,9 @@ export default function DashboardLayout({
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Logout">
-                <Link href="/">
-                  <LogOut />
-                  <span>Logout</span>
-                </Link>
+              <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
+                <LogOut />
+                <span>Logout</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -97,7 +117,6 @@ export default function DashboardLayout({
               {navItems.find((item) => item.href === pathname)?.label || 'MediConnect'}
             </h1>
           </div>
-
           <UserNav />
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-8">{children}</main>

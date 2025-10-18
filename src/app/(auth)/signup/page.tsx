@@ -1,4 +1,10 @@
+'use client';
+
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -9,9 +15,81 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { useAuth, useUser } from '@/firebase';
+import { initiateEmailSignUp } from '@/firebase/non-blocking-login';
+import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
+import { updateProfile } from 'firebase/auth';
+
+const formSchema = z.object({
+  fullName: z.string().min(2, 'Please enter your full name.'),
+  email: z.string().email('Please enter a valid email address.'),
+  password: z.string().min(6, 'Password must be at least 6 characters.'),
+});
 
 export default function SignupPage() {
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      fullName: '',
+      email: '',
+      password: '',
+    },
+  });
+
+   useEffect(() => {
+    if (!isUserLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, isUserLoading, router]);
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    try {
+      initiateEmailSignUp(auth, values.email, values.password);
+      // After sign-up, the onAuthStateChanged listener will catch the new user.
+      // We can listen for the user object to be populated and then update the profile.
+    } catch (error: any) {
+       toast({
+        variant: 'destructive',
+        title: 'Sign-up Failed',
+        description: error.message || 'An unexpected error occurred.',
+      });
+    }
+  }
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (currentUser && form.formState.isSubmitSuccessful) {
+        try {
+          await updateProfile(currentUser, {
+            displayName: form.getValues('fullName'),
+          });
+        } catch (error) {
+          console.error("Failed to update profile", error);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [auth, form]);
+
+
+  if (isUserLoading || user) {
+    return <div className="flex h-screen items-center justify-center"><p>Loading...</p></div>;
+  }
+
   return (
     <Card>
       <CardHeader className="space-y-1 text-center">
@@ -20,35 +98,68 @@ export default function SignupPage() {
           Enter your information to create a new account
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="full-name">Full Name</Label>
-          <Input id="full-name" placeholder="John Doe" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" placeholder="m@example.com" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" required />
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col gap-4">
-        <Button
-          className="w-full"
-          data-ai-hint="This button should trigger Firebase user registration."
-          asChild
-        >
-          <Link href="/dashboard">Create Account</Link>
-        </Button>
-        <div className="text-center text-sm">
-          Already have an account?{' '}
-          <Link href="/login" className="underline">
-            Login
-          </Link>
-        </div>
-      </CardFooter>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="fullName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Full Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="m@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting
+                ? 'Creating Account...'
+                : 'Create Account'}
+            </Button>
+            <div className="text-center text-sm">
+              Already have an account?{' '}
+              <Link href="/login" className="underline">
+                Login
+              </Link>
+            </div>
+          </CardFooter>
+        </form>
+      </Form>
     </Card>
   );
 }
