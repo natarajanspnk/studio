@@ -233,7 +233,7 @@ export default function StaffPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {!doctors || doctors.length === 0 && (
+                  {(!doctors || doctors.length === 0) && (
                     <TableRow>
                       <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
                         No doctors found. Add one to get started.
