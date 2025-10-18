@@ -175,66 +175,74 @@ export default function StaffPage() {
           <CardContent>
             {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
             {error && <p className="text-center text-destructive">Error loading doctors. Please try again.</p>}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Specialty</TableHead>
-                  <TableHead>Availability</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {!isLoading && !error && doctors?.map((doctor) => (
-                  <TableRow key={doctor.id}>
-                    <TableCell className="font-medium">
-                      Dr. {doctor.firstName} {doctor.lastName}
-                    </TableCell>
-                    <TableCell>{doctor.specialty}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          doctor.isAvailable ? 'default' : 'secondary'
-                        }
-                         className={doctor.isAvailable ? 'bg-green-500' : ''}
-                      >
-                        {doctor.isAvailable ? 'Available' : 'Unavailable'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                       <div>{doctor.email}</div>
-                       <div className="text-sm text-muted-foreground">{doctor.phone}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => openEditDialog(doctor)}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => openDeleteDialog(doctor)}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            {!isLoading && !error && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Specialty</TableHead>
+                    <TableHead>Availability</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-             {!isLoading && !error && doctors?.length === 0 && <p className="text-center text-muted-foreground py-8">No doctors found. Add one to get started.</p>}
+                </TableHeader>
+                <TableBody>
+                  {doctors && doctors.map((doctor) => (
+                    <TableRow key={doctor.id}>
+                      <TableCell className="font-medium">
+                        Dr. {doctor.firstName} {doctor.lastName}
+                      </TableCell>
+                      <TableCell>{doctor.specialty}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            doctor.isAvailable ? 'default' : 'secondary'
+                          }
+                          className={doctor.isAvailable ? 'bg-green-500' : ''}
+                        >
+                          {doctor.isAvailable ? 'Available' : 'Unavailable'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div>{doctor.email}</div>
+                        <div className="text-sm text-muted-foreground">{doctor.phone}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => openEditDialog(doctor)}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => openDeleteDialog(doctor)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!doctors || doctors.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                        No doctors found. Add one to get started.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
         <DialogContent className="sm:max-w-[425px]">
