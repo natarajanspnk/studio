@@ -2,167 +2,137 @@
  * @fileoverview Firestore Security Rules for MediConnect Platform
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model, ensuring that only authenticated users can access their own data. Doctor and Patient profile information is secured by path-based ownership,
- * while appointment and health records are stored in user-specific subcollections, further restricting access.
+ * This ruleset enforces a strict user-ownership model, ensuring that users can only access their own data.
  *
  * Data Structure:
- * - /patients/{patientId}: Stores patient profile information, accessible only by the patient.
- * - /doctors/{doctorId}: Stores doctor profile information, accessible only by the doctor.
- * - /patients/{patientId}/appointments/{appointmentId}: Stores appointments for a specific patient, accessible only by the patient.
- * - /doctors/{doctorId}/appointments/{appointmentId}: Stores appointments for a specific doctor, accessible only by the doctor.
- * - /patients/{patientId}/healthRecords/{healthRecordId}: Stores health records for a specific patient, accessible only by the patient.
+ * - Patients and Doctors data is stored under /patients/{patientId} and /doctors/{doctorId} respectively.
+ * - Appointments are stored as subcollections under both /patients/{patientId}/appointments/{appointmentId} and /doctors/{doctorId}/appointments/{appointmentId}.
+ * - HealthRecords are stored as subcollections under /patients/{patientId}/healthRecords/{healthRecordId}.
  *
  * Key Security Decisions:
- * - User data is segregated under dedicated /patients/{patientId} and /doctors/{doctorId} paths.
- * - Appointments are duplicated as subcollections of both patients and doctors to allow for efficient querying.
- * - No user listing is allowed to prevent unauthorized data access.
- * - Data consistency between the document ID and the path parameters is enforced on create.
- * - Attempts to modify the document ID after creation are denied.
+ * - Users (patients and doctors) can only read and write their own profile data.
+ * - Listing of doctors is allowed for all users.
+ * - Appointments and health records can only be accessed by the associated patient or doctor.
  *
  * Denormalization for Authorization:
- * The `patientId` and `doctorId` are inherently denormalized through the document path, enabling simple ownership checks without requiring additional `get()` calls.
+ *  - The patientId and doctorId are denormalized into the respective /appointments and /healthRecords subcollections to allow direct ownership checks.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secures patient profile information.
+     * @description Allows users to read and write their own patient profile.
      * @path /patients/{patientId}
-     * @allow (create) - Authenticated user with UID matching the patientId can create their profile.
-     * @allow (get, update, delete) - Authenticated user with UID matching the patientId can access or modify their profile.
-     * @deny (create) - Authenticated user with UID not matching the patientId cannot create a profile for another user.
-     * @deny (get, update, delete) - Authenticated user with UID not matching the patientId cannot access or modify another user's profile.
+     * @allow (create) request.auth.uid == 'patientId'
+     * @allow (get) request.auth.uid == 'patientId'
+     * @allow (update) request.auth.uid == 'patientId'
+     * @allow (delete) request.auth.uid == 'patientId'
+     * @deny (create) request.auth.uid != 'patientId'
+     * @deny (get) request.auth.uid != 'patientId'
+     * @deny (update) request.auth.uid != 'patientId'
+     * @deny (delete) request.auth.uid != 'patientId'
      * @principle Enforces document ownership for writes.
      */
     match /patients/{patientId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(patientId);
+      allow get: if isSignedIn() && isOwner(patientId);
       allow list: if false;
-      allow create: if isOwner(patientId) && request.resource.data.id == patientId;
-      allow update: if isExistingOwner(patientId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(patientId);
+      allow create: if isSignedIn() && isOwner(patientId) && request.resource.data.id == patientId;
+      allow update: if isSignedIn() && isOwner(patientId) && resource.data.id == request.resource.data.id;
+      allow delete: if isSignedIn() && isExistingOwner(patientId);
     }
 
     /**
-     * @description Secures doctor profile information.
+     * @description Allows any user to read the list of doctors, but restricts creation, update, and deletion.
      * @path /doctors/{doctorId}
-     * @allow (create) - Authenticated user with UID matching the doctorId can create their profile.
-     * @allow (get, update, delete) - Authenticated user with UID matching the doctorId can access or modify their profile.
-     * @deny (create) - Authenticated user with UID not matching the doctorId cannot create a profile for another user.
-     * @deny (get, update, delete) - Authenticated user with UID not matching the doctorId cannot access or modify another user's profile.
-     * @principle Enforces document ownership for writes.
+     * @allow (list) true
+     * @allow (get) true
+     * @allow (create) request.auth.uid == 'doctorId'
+     * @allow (update) request.auth.uid == 'doctorId'
+     * @allow (delete) request.auth.uid == 'doctorId'
+     * @deny (create) request.auth.uid != 'doctorId'
+     * @deny (update) request.auth.uid != 'doctorId'
+     * @deny (delete) request.auth.uid != 'doctorId'
+     * @principle Public read, owner-only writes for doctor profiles.
      */
     match /doctors/{doctorId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(doctorId) {
-        return isSignedIn() && request.auth.uid == doctorId;
-      }
-
-      function isExistingOwner(doctorId) {
-        return isOwner(doctorId) && resource != null;
-      }
-
-      allow get: if isOwner(doctorId);
-      allow list: if false;
-      allow create: if isOwner(doctorId) && request.resource.data.id == doctorId;
-      allow update: if isExistingOwner(doctorId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(doctorId);
+      allow get, list: if true;
+      allow create: if isSignedIn() && isOwner(doctorId) && request.resource.data.id == doctorId;
+      allow update: if isSignedIn() && isOwner(doctorId) && resource.data.id == request.resource.data.id;
+      allow delete: if isSignedIn() && isExistingOwner(doctorId);
     }
 
     /**
-     * @description Secures appointments associated with a specific patient.
+     * @description Allows patients to manage their own appointments.
      * @path /patients/{patientId}/appointments/{appointmentId}
-     * @allow (create, get, update, delete) - Authenticated user with UID matching the patientId can manage their appointments.
-     * @deny (create, get, update, delete) - Authenticated user with UID not matching the patientId cannot manage appointments for other patients.
-     * @principle Enforces document ownership for writes within a subcollection.
+     * @allow (create) request.auth.uid == 'patientId'
+     * @allow (get) request.auth.uid == 'patientId'
+     * @allow (update) request.auth.uid == 'patientId'
+     * @allow (delete) request.auth.uid == 'patientId'
+     * @deny (create) request.auth.uid != 'patientId'
+     * @deny (get) request.auth.uid != 'patientId'
+     * @deny (update) request.auth.uid != 'patientId'
+     * @deny (delete) request.auth.uid != 'patientId'
+     * @principle Enforces document ownership for appointments by patients.
      */
     match /patients/{patientId}/appointments/{appointmentId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(patientId) {
-        return isSignedIn() && request.auth.uid == patientId;
-      }
-
-       function isExistingOwner(patientId) {
-        return isOwner(patientId) && resource != null;
-      }
-
-      allow get: if isOwner(patientId);
-      allow list: if isOwner(patientId);
-      allow create: if isOwner(patientId) && request.resource.data.patientId == patientId;
-      allow update: if isExistingOwner(patientId) && request.resource.data.patientId == resource.data.patientId;
-      allow delete: if isExistingOwner(patientId);
-    }
-
-     /**
-     * @description Secures appointments associated with a specific doctor.
-     * @path /doctors/{doctorId}/appointments/{appointmentId}
-     * @allow (create, get, update, delete) - Authenticated user with UID matching the doctorId can manage their appointments.
-     * @deny (create, get, update, delete) - Authenticated user with UID not matching the doctorId cannot manage appointments for other doctors.
-     * @principle Enforces document ownership for writes within a subcollection.
-     */
-    match /doctors/{doctorId}/appointments/{appointmentId} {
-       function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(doctorId) {
-        return isSignedIn() && request.auth.uid == doctorId;
-      }
-
-       function isExistingOwner(doctorId) {
-        return isOwner(doctorId) && resource != null;
-      }
-
-      allow get: if isOwner(doctorId);
-      allow list: if isOwner(doctorId);
-      allow create: if isOwner(doctorId) && request.resource.data.doctorId == doctorId;
-      allow update: if isExistingOwner(doctorId) && request.resource.data.doctorId == resource.data.doctorId;
-      allow delete: if isExistingOwner(doctorId);
+      allow get, list: if isSignedIn() && isOwner(patientId);
+      allow create: if isSignedIn() && isOwner(patientId) && request.resource.data.patientId == patientId;
+      allow update: if isSignedIn() && isOwner(patientId) && resource.data.patientId == patientId;
+      allow delete: if isSignedIn() && isExistingOwner(patientId) && resource.data.patientId == patientId;
     }
 
     /**
-     * @description Secures health records associated with a specific patient.
+     * @description Allows doctors to manage their own appointments.
+     * @path /doctors/{doctorId}/appointments/{appointmentId}
+     * @allow (create) request.auth.uid == 'doctorId'
+     * @allow (get) request.auth.uid == 'doctorId'
+     * @allow (update) request.auth.uid == 'doctorId'
+     * @allow (delete) request.auth.uid == 'doctorId'
+     * @deny (create) request.auth.uid != 'doctorId'
+     * @deny (get) request.auth.uid != 'doctorId'
+     * @deny (update) request.auth.uid != 'doctorId'
+     * @deny (delete) request.auth.uid != 'doctorId'
+     * @principle Enforces document ownership for appointments by doctors.
+     */
+    match /doctors/{doctorId}/appointments/{appointmentId} {
+      allow get, list: if isSignedIn() && isOwner(doctorId);
+      allow create: if isSignedIn() && isOwner(doctorId) && request.resource.data.doctorId == doctorId;
+      allow update: if isSignedIn() && isOwner(doctorId) && resource.data.doctorId == doctorId;
+      allow delete: if isSignedIn() && isExistingOwner(doctorId) && resource.data.doctorId == doctorId;
+    }
+
+    /**
+     * @description Allows patients to manage their own health records.
      * @path /patients/{patientId}/healthRecords/{healthRecordId}
-     * @allow (create, get, update, delete) - Authenticated user with UID matching the patientId can manage their health records.
-     * @deny (create, get, update, delete) - Authenticated user with UID not matching the patientId cannot manage health records for other patients.
-     * @principle Enforces document ownership for writes within a subcollection.
+     * @allow (create) request.auth.uid == 'patientId'
+     * @allow (get) request.auth.uid == 'patientId'
+     * @allow (update) request.auth.uid == 'patientId'
+     * @allow (delete) request.auth.uid == 'patientId'
+     * @deny (create) request.auth.uid != 'patientId'
+     * @deny (get) request.auth.uid != 'patientId'
+     * @deny (update) request.auth.uid != 'patientId'
+     * @deny (delete) request.auth.uid != 'patientId'
+     * @principle Enforces document ownership for health records.
      */
     match /patients/{patientId}/healthRecords/{healthRecordId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow get, list: if isSignedIn() && isOwner(patientId);
+      allow create: if isSignedIn() && isOwner(patientId) && request.resource.data.patientId == patientId;
+      allow update: if isSignedIn() && isOwner(patientId) && resource.data.patientId == patientId;
+      allow delete: if isSignedIn() && isExistingOwner(patientId) && resource.data.patientId == patientId;
+    }
 
-      function isOwner(patientId) {
-        return isSignedIn() && request.auth.uid == patientId;
-      }
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-      function isExistingOwner(patientId) {
-        return isOwner(patientId) && resource != null;
-      }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-      allow get: if isOwner(patientId);
-      allow list: if isOwner(patientId);
-      allow create: if isOwner(patientId) && request.resource.data.patientId == patientId;
-      allow update: if isExistingOwner(patientId) && request.resource.data.patientId == resource.data.patientId;
-      allow delete: if isExistingOwner(patientId);
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
     }
   }
 }
