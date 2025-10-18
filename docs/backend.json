@@ -1,0 +1,289 @@
+{
+  "entities": {
+    "Patient": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Patient",
+      "type": "object",
+      "description": "Represents a patient using the MediConnect platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the patient."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the patient."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the patient."
+        },
+        "dateOfBirth": {
+          "type": "string",
+          "description": "The date of birth of the patient.",
+          "format": "date-time"
+        },
+        "gender": {
+          "type": "string",
+          "description": "The gender of the patient."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the patient.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "The phone number of the patient."
+        },
+        "address": {
+          "type": "string",
+          "description": "The address of the patient."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "dateOfBirth",
+        "gender",
+        "email",
+        "phone",
+        "address"
+      ]
+    },
+    "Doctor": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Doctor",
+      "type": "object",
+      "description": "Represents a doctor using the MediConnect platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the doctor."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the doctor."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the doctor."
+        },
+        "specialty": {
+          "type": "string",
+          "description": "The medical specialty of the doctor."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the doctor.",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string",
+          "description": "The phone number of the doctor."
+        },
+        "address": {
+          "type": "string",
+          "description": "The address of the doctor."
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "specialty",
+        "email",
+        "phone",
+        "address"
+      ]
+    },
+    "Appointment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Appointment",
+      "type": "object",
+      "description": "Represents an appointment between a patient and a doctor.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the appointment."
+        },
+        "patientId": {
+          "type": "string",
+          "description": "Reference to Patient. (Relationship: Patient 1:N Appointment)"
+        },
+        "doctorId": {
+          "type": "string",
+          "description": "Reference to Doctor. (Relationship: Doctor 1:N Appointment)"
+        },
+        "dateTime": {
+          "type": "string",
+          "description": "The date and time of the appointment.",
+          "format": "date-time"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes related to the appointment."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the appointment (e.g., scheduled, completed, cancelled)."
+        }
+      },
+      "required": [
+        "id",
+        "patientId",
+        "doctorId",
+        "dateTime",
+        "status"
+      ]
+    },
+    "HealthRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "HealthRecord",
+      "type": "object",
+      "description": "Represents a patient's electronic health record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the health record."
+        },
+        "patientId": {
+          "type": "string",
+          "description": "Reference to Patient. (Relationship: Patient 1:1 HealthRecord)"
+        },
+        "createdDate": {
+          "type": "string",
+          "description": "The date the health record was created.",
+          "format": "date-time"
+        },
+        "lastUpdatedDate": {
+          "type": "string",
+          "description": "The date the health record was last updated.",
+          "format": "date-time"
+        },
+        "medicalHistory": {
+          "type": "string",
+          "description": "The medical history of the patient."
+        },
+        "currentMedications": {
+          "type": "string",
+          "description": "The current medications of the patient."
+        },
+        "allergies": {
+          "type": "string",
+          "description": "The allergies of the patient."
+        }
+      },
+      "required": [
+        "id",
+        "patientId",
+        "createdDate",
+        "lastUpdatedDate"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/patients/{patientId}",
+        "definition": {
+          "entityName": "Patient",
+          "schema": {
+            "$ref": "#/backend/entities/Patient"
+          },
+          "description": "Stores patient profile information. Only the authenticated user with the matching patientId can access. No denormalization is needed as ownership is implied by the path.",
+          "params": [
+            {
+              "name": "patientId",
+              "description": "The unique identifier for the patient, corresponding to the user's UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/doctors/{doctorId}",
+        "definition": {
+          "entityName": "Doctor",
+          "schema": {
+            "$ref": "#/backend/entities/Doctor"
+          },
+          "description": "Stores doctor profile information. Only the authenticated user with the matching doctorId can access. No denormalization is needed as ownership is implied by the path.",
+          "params": [
+            {
+              "name": "doctorId",
+              "description": "The unique identifier for the doctor, corresponding to the user's UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/patients/{patientId}/appointments/{appointmentId}",
+        "definition": {
+          "entityName": "Appointment",
+          "schema": {
+            "$ref": "#/backend/entities/Appointment"
+          },
+          "description": "Stores appointments associated with a specific patient. Only the patient (or authorized doctors, if implemented) can access these appointments. Includes patientId denormalized for authorization independence.",
+          "params": [
+            {
+              "name": "patientId",
+              "description": "The unique identifier for the patient."
+            },
+            {
+              "name": "appointmentId",
+              "description": "The unique identifier for the appointment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/doctors/{doctorId}/appointments/{appointmentId}",
+        "definition": {
+          "entityName": "Appointment",
+          "schema": {
+            "$ref": "#/backend/entities/Appointment"
+          },
+          "description": "Stores appointments associated with a specific doctor. Only the doctor can access these appointments. Includes doctorId denormalized for authorization independence.",
+          "params": [
+            {
+              "name": "doctorId",
+              "description": "The unique identifier for the doctor."
+            },
+            {
+              "name": "appointmentId",
+              "description": "The unique identifier for the appointment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/patients/{patientId}/healthRecords/{healthRecordId}",
+        "definition": {
+          "entityName": "HealthRecord",
+          "schema": {
+            "$ref": "#/backend/entities/HealthRecord"
+          },
+          "description": "Stores health records associated with a specific patient. Only the patient (or authorized doctors, potentially via a membership map within the record) can access these records. Includes patientId denormalized for authorization independence.",
+          "params": [
+            {
+              "name": "patientId",
+              "description": "The unique identifier for the patient."
+            },
+            {
+              "name": "healthRecordId",
+              "description": "The unique identifier for the health record."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure data privacy, security, and scalability for the MediConnect platform. It uses path-based ownership for user-specific data and denormalization to avoid complex queries and maintain authorization independence. The structure supports secure `list` operations via structural segregation. Appointments are organized as a subcollection of both patients and doctors to allow for easy querying from either perspective. HealthRecords are tied directly to a patient using a subcollection, ensuring only the patient (or authorized doctors, if implemented via a membership map in the health record) can access them. This design eliminates the need for `get()` calls in security rules, simplifying the rule structure and improving performance. The design employs the 'private data' access model for Patients and Doctors profile data."
+  }
+}

@@ -1,0 +1,138 @@
+/**
+ * @fileOverview
+ * This ruleset enforces a strict user-ownership model for patients and doctors,
+ * ensuring that only the authenticated user with the matching ID can access their
+ * profile data and associated resources. Appointments and health records are
+ * organized as subcollections of patients and doctors, respectively, to allow for
+ * easy querying and maintain authorization independence.
+ *
+ * Data Structure:
+ * - /patients/{patientId}
+ * - /doctors/{doctorId}
+ * - /patients/{patientId}/appointments/{appointmentId}
+ * - /doctors/{doctorId}/appointments/{appointmentId}
+ * - /patients/{patientId}/healthRecords/{healthRecordId}
+ *
+ * Key Security Decisions:
+ * - Users can only access their own patient or doctor documents.
+ * - List operations are allowed within user-scoped subcollections.
+ * - Data validation is relaxed in the interest of prototyping speed, focusing
+ *   only on authorization-critical fields.
+ *
+ * Denormalization for Authorization:
+ * - The 'patientId' is denormalized within the 'Appointment' and
+ *   'HealthRecord' documents to allow for simple ownership checks without
+ *   requiring additional reads.
+ *
+ * Structural Segregation:
+ * - User-specific data is stored in separate collections to avoid the need for
+ *   complex queries and maintain data privacy.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Allows access to patient documents only to the authenticated user with the matching patientId.
+     * @path /patients/{patientId}
+     * @allow (create) - Authenticated user with UID 'user_abc' can create their profile at /patients/user_abc.
+     * @allow (get) - Authenticated user with UID 'user_abc' can read their profile at /patients/user_abc.
+     * @allow (update) - Authenticated user with UID 'user_abc' can update their profile at /patients/user_abc.
+     * @allow (delete) - Authenticated user with UID 'user_abc' can delete their profile at /patients/user_abc.
+     * @deny (create) - Authenticated user with UID 'user_def' cannot create a profile at /patients/user_abc.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /patients/{patientId} {
+      allow get: if isOwner(patientId);
+      allow list: if false;
+      allow create: if isOwner(patientId);
+      allow update: if isExistingOwner(patientId);
+      allow delete: if isExistingOwner(patientId);
+    }
+
+    /**
+     * @description Allows access to doctor documents only to the authenticated user with the matching doctorId.
+     * @path /doctors/{doctorId}
+     * @allow (create) - Authenticated user with UID 'user_abc' can create their profile at /doctors/user_abc.
+     * @allow (get) - Authenticated user with UID 'user_abc' can read their profile at /doctors/user_abc.
+     * @allow (update) - Authenticated user with UID 'user_abc' can update their profile at /doctors/user_abc.
+     * @allow (delete) - Authenticated user with UID 'user_abc' can delete their profile at /doctors/user_abc.
+     * @deny (create) - Authenticated user with UID 'user_def' cannot create a profile at /doctors/user_abc.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /doctors/{doctorId} {
+      allow get: if isOwner(doctorId);
+      allow list: if false;
+      allow create: if isOwner(doctorId);
+      allow update: if isExistingOwner(doctorId);
+      allow delete: if isExistingOwner(doctorId);
+    }
+
+    /**
+     * @description Allows access to appointments associated with a specific patient, only to the patient.
+     * @path /patients/{patientId}/appointments/{appointmentId}
+     * @allow (create) - Authenticated user with UID 'user_abc' can create an appointment under /patients/user_abc/appointments/appt_123.
+     * @allow (get) - Authenticated user with UID 'user_abc' can read an appointment under /patients/user_abc/appointments/appt_123.
+     * @allow (update) - Authenticated user with UID 'user_abc' can update an appointment under /patients/user_abc/appointments/appt_123.
+     * @allow (delete) - Authenticated user with UID 'user_abc' can delete an appointment under /patients/user_abc/appointments/appt_123.
+     * @deny (create) - Authenticated user with UID 'user_def' cannot create an appointment under /patients/user_abc/appointments/appt_123.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /patients/{patientId}/appointments/{appointmentId} {
+      allow get: if isOwner(patientId);
+      allow list: if isOwner(patientId);
+      allow create: if isOwner(patientId);
+      allow update: if isExistingOwner(patientId);
+      allow delete: if isExistingOwner(patientId);
+    }
+
+    /**
+     * @description Allows access to appointments associated with a specific doctor, only to the doctor.
+     * @path /doctors/{doctorId}/appointments/{appointmentId}
+     * @allow (create) - Authenticated user with UID 'user_abc' can create an appointment under /doctors/user_abc/appointments/appt_123.
+     * @allow (get) - Authenticated user with UID 'user_abc' can read an appointment under /doctors/user_abc/appointments/appt_123.
+     * @allow (update) - Authenticated user with UID 'user_abc' can update an appointment under /doctors/user_abc/appointments/appt_123.
+     * @allow (delete) - Authenticated user with UID 'user_abc' can delete an appointment under /doctors/user_abc/appointments/appt_123.
+     * @deny (create) - Authenticated user with UID 'user_def' cannot create an appointment under /doctors/user_abc/appointments/appt_123.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /doctors/{doctorId}/appointments/{appointmentId} {
+      allow get: if isOwner(doctorId);
+      allow list: if isOwner(doctorId);
+      allow create: if isOwner(doctorId);
+      allow update: if isExistingOwner(doctorId);
+      allow delete: if isExistingOwner(doctorId);
+    }
+
+    /**
+     * @description Allows access to health records associated with a specific patient, only to the patient.
+     * @path /patients/{patientId}/healthRecords/{healthRecordId}
+     * @allow (create) - Authenticated user with UID 'user_abc' can create a health record under /patients/user_abc/healthRecords/record_123.
+     * @allow (get) - Authenticated user with UID 'user_abc' can read a health record under /patients/user_abc/healthRecords/record_123.
+     * @allow (update) - Authenticated user with UID 'user_abc' can update a health record under /patients/user_abc/healthRecords/record_123.
+     * @allow (delete) - Authenticated user with UID 'user_abc' can delete a health record under /patients/user_abc/healthRecords/record_123.
+     * @deny (create) - Authenticated user with UID 'user_def' cannot create a health record under /patients/user_abc/healthRecords/record_123.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /patients/{patientId}/healthRecords/{healthRecordId} {
+      allow get: if isOwner(patientId);
+      allow list: if isOwner(patientId);
+      allow create: if isOwner(patientId);
+      allow update: if isExistingOwner(patientId);
+      allow delete: if isExistingOwner(patientId);
+    }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return isSignedIn() && request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
+  }
+}
