@@ -10,6 +10,7 @@ import {
   Video,
   LogOut,
   Settings,
+  Users,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -32,10 +33,15 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/dashboard/symptom-checker', icon: Stethoscope, label: 'Symptom Checker' },
+  {
+    href: '/dashboard/symptom-checker',
+    icon: Stethoscope,
+    label: 'Symptom Checker',
+  },
   { href: '/dashboard/appointments', icon: Calendar, label: 'Appointments' },
   { href: '/dashboard/records', icon: FileText, label: 'Health Records' },
   { href: '/dashboard/consultations', icon: Video, label: 'Consultations' },
+  { href: '/dashboard/staff', icon: Users, label: 'Staff' },
 ];
 
 export default function DashboardLayout({
@@ -79,7 +85,7 @@ export default function DashboardLayout({
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === item.href}
+                  isActive={pathname.startsWith(item.href)}
                   tooltip={item.label}
                 >
                   <Link href={item.href}>
@@ -115,7 +121,8 @@ export default function DashboardLayout({
           <div className="flex items-center gap-2">
             <SidebarTrigger className="md:hidden" />
             <h1 className="font-headline text-xl font-semibold">
-              {navItems.find((item) => item.href === pathname)?.label || 'MediConnect'}
+              {navItems.find((item) => pathname.startsWith(item.href))?.label ||
+                'MediConnect'}
             </h1>
           </div>
           <UserNav />

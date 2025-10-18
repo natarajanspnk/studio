@@ -86,6 +86,10 @@
         "address": {
           "type": "string",
           "description": "The address of the doctor."
+        },
+        "isAvailable": {
+          "type": "boolean",
+          "description": "Indicates if the doctor is currently available for consultations."
         }
       },
       "required": [
@@ -95,7 +99,8 @@
         "specialty",
         "email",
         "phone",
-        "address"
+        "address",
+        "isAvailable"
       ]
     },
     "Appointment": {

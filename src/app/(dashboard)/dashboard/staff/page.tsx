@@ -1,0 +1,274 @@
+'use client';
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  setDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { LoadingSpinner } from '@/components/loading-spinner';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useState } from 'react';
+import { DoctorForm, type DoctorFormValues } from './doctor-form';
+import { useToast } from '@/hooks/use-toast';
+import { WithId } from '@/firebase/firestore/use-collection';
+
+export type Doctor = {
+  firstName: string;
+  lastName: string;
+  specialty: string;
+  email: string;
+  phone: string;
+  address: string;
+  isAvailable: boolean;
+};
+
+export default function StaffPage() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<WithId<Doctor> | null>(
+    null
+  );
+  const { toast } = useToast();
+
+  const firestore = useFirestore();
+  const doctorsCollectionRef = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'doctors') : null),
+    [firestore]
+  );
+  const {
+    data: doctors,
+    isLoading,
+    error,
+  } = useCollection<Doctor>(doctorsCollectionRef);
+
+  const handleFormSubmit = (values: DoctorFormValues) => {
+    if (!firestore) return;
+
+    const doctorId = selectedDoctor ? selectedDoctor.id : doc(collection(firestore, 'doctors')).id;
+    const doctorRef = doc(firestore, 'doctors', doctorId);
+
+    const doctorData: Doctor & {id: string} = {
+      ...values,
+      id: doctorId
+    };
+
+    setDocumentNonBlocking(doctorRef, doctorData, { merge: true });
+
+    toast({
+      title: selectedDoctor ? 'Doctor Updated' : 'Doctor Added',
+      description: `Dr. ${values.firstName} ${values.lastName} has been successfully saved.`,
+    });
+
+    setDialogOpen(false);
+    setSelectedDoctor(null);
+  };
+
+  const openEditDialog = (doctor: WithId<Doctor>) => {
+    setSelectedDoctor(doctor);
+    setDialogOpen(true);
+  };
+
+  const openDeleteDialog = (doctor: WithId<Doctor>) => {
+    setSelectedDoctor(doctor);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteDoctor = () => {
+    if (!firestore || !selectedDoctor) return;
+
+    const doctorRef = doc(firestore, 'doctors', selectedDoctor.id);
+    deleteDocumentNonBlocking(doctorRef);
+
+    toast({
+      title: 'Doctor Deleted',
+      description: `Dr. ${selectedDoctor.firstName} ${selectedDoctor.lastName} has been removed.`,
+    });
+
+    setDeleteConfirmOpen(false);
+    setSelectedDoctor(null);
+  };
+
+  const openAddDialog = () => {
+    setSelectedDoctor(null);
+    setDialogOpen(true);
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="font-headline text-3xl font-bold tracking-tight">
+          Staff Management
+        </h2>
+        <p className="mt-2 text-muted-foreground">
+          View, add, edit, or remove doctors from the platform.
+        </p>
+      </div>
+
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setSelectedDoctor(null);
+        }}
+      >
+        <Card>
+          <CardHeader className="flex-row items-center justify-between">
+            <div>
+              <CardTitle>Doctor Roster</CardTitle>
+              <CardDescription>
+                The list of all doctors currently on the platform.
+              </CardDescription>
+            </div>
+            <DialogTrigger asChild>
+              <Button onClick={openAddDialog}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Doctor
+              </Button>
+            </DialogTrigger>
+          </CardHeader>
+          <CardContent>
+            {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
+            {error && <p className="text-center text-destructive">Error loading doctors. Please try again.</p>}
+            {!isLoading && !error && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Specialty</TableHead>
+                    <TableHead>Availability</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {doctors?.map((doctor) => (
+                    <TableRow key={doctor.id}>
+                      <TableCell className="font-medium">
+                        Dr. {doctor.firstName} {doctor.lastName}
+                      </TableCell>
+                      <TableCell>{doctor.specialty}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            doctor.isAvailable ? 'default' : 'secondary'
+                          }
+                           className={doctor.isAvailable ? 'bg-green-500' : ''}
+                        >
+                          {doctor.isAvailable ? 'Available' : 'Unavailable'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                         <div>{doctor.email}</div>
+                         <div className="text-sm text-muted-foreground">{doctor.phone}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => openEditDialog(doctor)}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => openDeleteDialog(doctor)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+             {!isLoading && doctors?.length === 0 && <p className="text-center text-muted-foreground py-8">No doctors found. Add one to get started.</p>}
+          </CardContent>
+        </Card>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDoctor ? 'Edit Doctor' : 'Add New Doctor'}
+            </DialogTitle>
+          </DialogHeader>
+          <DoctorForm
+            onSubmit={handleFormSubmit}
+            defaultValues={selectedDoctor}
+          />
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete Dr.{' '}
+              {selectedDoctor?.firstName} {selectedDoctor?.lastName} and remove
+              their data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedDoctor(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteDoctor}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

@@ -24,42 +24,38 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { LoadingSpinner } from '@/components/loading-spinner';
+import { WithId } from '@/firebase/firestore/use-collection';
 
-const doctors = [
-  {
-    id: 1,
-    name: 'Dr. Emily Carter',
-    specialty: 'Cardiologist',
-    avatarId: 'doctor-1',
-  },
-  {
-    id: 2,
-    name: 'Dr. Ben Adams',
-    specialty: 'Dermatologist',
-    avatarId: 'doctor-2',
-  },
-  {
-    id: 3,
-    name: 'Dr. Chloe Davis',
-    specialty: 'Pediatrician',
-    avatarId: 'doctor-3',
-  },
-];
+type Doctor = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    specialty: string;
+    isAvailable: boolean;
+};
 
 const timeSlots = ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'];
 
 export default function AppointmentsPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedSlot, setSelectedSlot] = useState<{ doctor: any, time: string } | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<{ doctor: WithId<Doctor>, time: string } | null>(null);
   const { toast } = useToast();
+
+  const firestore = useFirestore();
+  const doctorsCollection = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'doctors') : null),
+    [firestore]
+  );
+  const { data: doctors, isLoading } = useCollection<Doctor>(doctorsCollection);
 
   const handleBookAppointment = () => {
     if (selectedSlot && date) {
       toast({
         title: 'Appointment Booked!',
-        description: `Your appointment with ${selectedSlot.doctor.name} on ${date.toLocaleDateString()} at ${selectedSlot.time} is confirmed.`,
+        description: `Your appointment with Dr. ${selectedSlot.doctor.firstName} ${selectedSlot.doctor.lastName} on ${date.toLocaleDateString()} at ${selectedSlot.time} is confirmed.`,
       });
       setSelectedSlot(null);
     }
@@ -93,14 +89,16 @@ export default function AppointmentsPage() {
         </Card>
 
         <div className="space-y-6 lg:col-span-2">
-          {doctors.map((doctor) => {
+           {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
+          {doctors?.map((doctor) => {
             const avatar = placeholderImages.find(
-              (img) => img.id === doctor.avatarId
-            );
+              (img) => img.id === `doctor-${doctor.id.slice(0,1)}`
+            ) || placeholderImages.find(img => img.id === 'doctor-1');
+
             return (
               <Card key={doctor.id}>
                 <CardHeader className="flex flex-row items-center gap-4 space-y-0">
-                  <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full">
+                   <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full">
                     {avatar && (
                        <Image
                         src={avatar.imageUrl}
@@ -110,9 +108,10 @@ export default function AppointmentsPage() {
                         data-ai-hint={avatar.imageHint}
                       />
                     )}
+                    <div className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-card ${doctor.isAvailable ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                   </div>
                   <div>
-                    <CardTitle>{doctor.name}</CardTitle>
+                    <CardTitle>Dr. {doctor.firstName} {doctor.lastName}</CardTitle>
                     <CardDescription>{doctor.specialty}</CardDescription>
                   </div>
                 </CardHeader>
@@ -123,6 +122,7 @@ export default function AppointmentsPage() {
                       <AlertDialogTrigger asChild key={time}>
                         <Button
                           variant="outline"
+                           disabled={!doctor.isAvailable}
                           onClick={() => setSelectedSlot({ doctor, time })}
                         >
                           {time}
@@ -150,7 +150,7 @@ export default function AppointmentsPage() {
           {selectedSlot && date && (
             <div className="space-y-4 rounded-lg border p-4">
                <div className="font-semibold">Appointment Details:</div>
-               <p><span className="font-medium">Doctor:</span> {selectedSlot.doctor.name} ({selectedSlot.doctor.specialty})</p>
+               <p><span className="font-medium">Doctor:</span> Dr. {selectedSlot.doctor.firstName} {selectedSlot.doctor.lastName} ({selectedSlot.doctor.specialty})</p>
                <p><span className="font-medium">Date:</span> {date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                <p><span className="font-medium">Time:</span> {selectedSlot.time}</p>
             </div>
