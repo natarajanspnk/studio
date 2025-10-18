@@ -28,6 +28,7 @@ import { initiateEmailSignUp } from '@/firebase/non-blocking-login';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
 import { updateProfile } from 'firebase/auth';
+import { LoadingSpinner } from '@/components/loading-spinner';
 
 const formSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name.'),
@@ -87,7 +88,7 @@ export default function SignupPage() {
 
 
   if (isUserLoading || user) {
-    return <div className="flex h-screen items-center justify-center"><p>Loading...</p></div>;
+    return <div className="flex h-screen items-center justify-center"><LoadingSpinner /></div>;
   }
 
   return (

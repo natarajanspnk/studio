@@ -28,6 +28,7 @@ import { UserNav } from '@/components/user-nav';
 import { useAuth, useUser } from '@/firebase';
 import { useEffect } from 'react';
 import { signOut } from 'firebase/auth';
+import { LoadingSpinner } from '@/components/loading-spinner';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -61,7 +62,7 @@ export default function DashboardLayout({
   if (isUserLoading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Loading...</p>
+        <LoadingSpinner />
       </div>
     );
   }

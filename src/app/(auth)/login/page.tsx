@@ -28,6 +28,7 @@ import { useAuth, useUser } from '@/firebase';
 import { initiateEmailSignIn } from '@/firebase/non-blocking-login';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
+import { LoadingSpinner } from '@/components/loading-spinner';
 
 const formSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -70,7 +71,7 @@ export default function LoginPage() {
   if (isUserLoading || user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Loading...</p>
+        <LoadingSpinner />
       </div>
     );
   }
