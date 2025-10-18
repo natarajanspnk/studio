@@ -21,9 +21,11 @@ import {
   useCollection,
   useFirestore,
   useMemoFirebase,
+} from '@/firebase';
+import {
   setDocumentNonBlocking,
   deleteDocumentNonBlocking,
-} from '@/firebase';
+} from '@/firebase/non-blocking-updates';
 import { collection, doc } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { Badge } from '@/components/ui/badge';
