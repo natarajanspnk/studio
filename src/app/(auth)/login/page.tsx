@@ -78,7 +78,7 @@ export default function LoginPage() {
   return (
     <Card>
       <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
+        <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
         <CardDescription>
           Enter your email below to login to your account
         </CardDescription>
