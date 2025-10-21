@@ -98,7 +98,7 @@ export default function LoginPage() {
               name="role"
               render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel>Are you a ?!</FormLabel>
+                  <FormLabel>I am a...</FormLabel>
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
