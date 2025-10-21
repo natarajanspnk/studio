@@ -114,7 +114,7 @@ export default function SignupPage() {
   return (
     <Card>
       <CardHeader className="space-y-1 text-center">
-        <CardTitle className="font-headline text-2xl">Create an account</CardTitle>
+        <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
         <CardDescription>
           Enter your information to create a new account
         </CardDescription>
