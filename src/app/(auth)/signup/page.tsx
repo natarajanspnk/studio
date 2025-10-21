@@ -26,16 +26,20 @@ import {
 import { useAuth, useFirestore, useUser } from '@/firebase';
 import { initiateEmailSignUp } from '@/firebase/non-blocking-login';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { updateProfile } from 'firebase/auth';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, doc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const formSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name.'),
   email: z.string().email('Please enter a valid email address.'),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
+  role: z.enum(['patient', 'doctor'], {
+    required_error: 'You need to select a role.',
+  }),
 });
 
 export default function SignupPage() {
@@ -51,14 +55,20 @@ export default function SignupPage() {
       fullName: '',
       email: '',
       password: '',
+      role: 'patient',
     },
   });
 
-   useEffect(() => {
+  useEffect(() => {
+    const role = form.watch('role');
     if (!isUserLoading && user) {
-      router.push('/dashboard');
+        if(role === 'doctor') {
+            router.push('/dashboard/staff');
+        } else {
+            router.push('/dashboard');
+        }
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -66,7 +76,7 @@ export default function SignupPage() {
       // After sign-up, the onAuthStateChanged listener will catch the new user.
       // We can listen for the user object to be populated and then update the profile.
     } catch (error: any) {
-       toast({
+      toast({
         variant: 'destructive',
         title: 'Sign-up Failed',
         description: error.message || 'An unexpected error occurred.',
@@ -83,32 +93,58 @@ export default function SignupPage() {
             displayName: form.getValues('fullName'),
           });
 
-          // Create Patient document in Firestore
-          const [firstName, ...lastNameParts] = form.getValues('fullName').split(' ');
-          const patientRef = doc(firestore, 'patients', currentUser.uid);
-          const patientData = {
-            id: currentUser.uid,
-            firstName,
-            lastName: lastNameParts.join(' '),
-            email: currentUser.email,
-            dateOfBirth: '',
-            gender: '',
-            phone: '',
-            address: ''
-          };
-          setDocumentNonBlocking(patientRef, patientData, { merge: true });
+          const role = form.getValues('role');
+          const [firstName, ...lastNameParts] =
+            form.getValues('fullName').split(' ');
 
+          if (role === 'patient') {
+            const patientRef = doc(firestore, 'patients', currentUser.uid);
+            const patientData = {
+              id: currentUser.uid,
+              role: 'patient',
+              firstName,
+              lastName: lastNameParts.join(' '),
+              email: currentUser.email,
+              dateOfBirth: '',
+              gender: '',
+              phone: '',
+              address: '',
+            };
+            setDocumentNonBlocking(patientRef, patientData, { merge: true });
+          } else if (role === 'doctor') {
+            const doctorRef = doc(firestore, 'doctors', currentUser.uid);
+            const doctorData = {
+              id: currentUser.uid,
+              role: 'doctor',
+              firstName,
+              lastName: lastNameParts.join(' '),
+              email: currentUser.email,
+              specialty: 'General Medicine', // Default value
+              phone: '',
+              address: '',
+              isAvailable: false,
+            };
+            setDocumentNonBlocking(doctorRef, doctorData, { merge: true });
+          }
         } catch (error) {
-          console.error("Failed to update profile or create patient document", error);
+          console.error('Failed to update profile or create user document', error);
+          toast({
+            variant: 'destructive',
+            title: 'Setup Failed',
+            description: 'Could not create your user profile. Please try again.',
+          });
         }
       }
     });
     return () => unsubscribe();
-  }, [auth, form, firestore]);
-
+  }, [auth, form, firestore, toast]);
 
   if (isUserLoading || user) {
-    return <div className="flex h-screen items-center justify-center"><LoadingSpinner /></div>;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   return (
@@ -122,6 +158,36 @@ export default function SignupPage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>I want to sign up as a...</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex space-x-4"
+                    >
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="patient" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Patient</FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-2 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="doctor" />
+                        </FormControl>
+                        <FormLabel className="font-normal">Doctor</FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="fullName"
