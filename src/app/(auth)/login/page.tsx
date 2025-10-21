@@ -15,7 +15,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Form,
   FormControl,
@@ -79,7 +78,7 @@ export default function LoginPage() {
   return (
     <Card>
       <CardHeader className="space-y-1 text-center">
-        <CardTitle className="font-headline text-2xl">Welcome Back</CardTitle>
+        <CardTitle className="font-headline text-3xl font-bold">Welcome Back</CardTitle>
         <CardDescription>
           Enter your email below to login to your account
         </CardDescription>
