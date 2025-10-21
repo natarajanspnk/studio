@@ -22,7 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useAuth, useDoc, useFirestore, useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { updateProfile } from 'firebase/auth';
+import { updateProfile, verifyBeforeUpdateEmail } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { LoadingSpinner } from '@/components/loading-spinner';
@@ -73,13 +73,23 @@ export default function ProfilePage() {
   }, [user, patientData, form]);
 
   async function onSubmit(data: ProfileFormValues) {
-    if (!user || !firestore) return;
+    if (!user || !firestore || !auth.currentUser) return;
 
     try {
       // Update Firebase Auth display name
-      if (auth.currentUser && data.fullName !== user.displayName) {
+      if (data.fullName !== user.displayName) {
         await updateProfile(auth.currentUser, { displayName: data.fullName });
       }
+      
+      // Update Firebase Auth email
+      if (data.email !== user.email) {
+        await verifyBeforeUpdateEmail(auth.currentUser, data.email);
+        toast({
+            title: 'Verification Email Sent',
+            description: `A verification link has been sent to ${data.email}. Please check your inbox to confirm the change.`,
+        });
+      }
+
 
       // Update Firestore patient document
       const [firstName, ...lastNameParts] = data.fullName.split(' ');
@@ -102,7 +112,7 @@ export default function ProfilePage() {
       toast({
         variant: 'destructive',
         title: 'Update Failed',
-        description: error.message || 'An unexpected error occurred.',
+        description: error.message || 'An unexpected error occurred. You may need to sign out and sign back in to change your email.',
       });
     }
   }
@@ -130,8 +140,7 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle>Personal Details</CardTitle>
           <CardDescription>
-            Update your information below. Your email address cannot be
-            changed.
+            Update your information below. To change your email, you will be sent a verification link.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -158,7 +167,7 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="m@example.com" {...field} readOnly disabled />
+                        <Input placeholder="m@example.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
