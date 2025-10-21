@@ -61,8 +61,10 @@ export default function DashboardLayout({
   }, [user, isUserLoading, router]);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    router.push('/');
+    if (auth) {
+      await signOut(auth);
+      router.push('/');
+    }
   };
 
   if (isUserLoading || !user) {
