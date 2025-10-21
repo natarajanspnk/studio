@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,10 +12,68 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function ConsultationPage({ params }: { params: { id: string } }) {
-  const patientImage = placeholderImages.find((img) => img.id === 'consultation-patient');
   const doctorImage = placeholderImages.find((img) => img.id === 'consultation-doctor');
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isCameraOn, setIsCameraOn] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const getCameraPermission = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setHasCameraPermission(true);
+        setIsCameraOn(true);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+        setHasCameraPermission(false);
+        setIsCameraOn(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this app.',
+        });
+      }
+    };
+
+    getCameraPermission();
+
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+    }
+  }, [toast]);
+
+  const toggleMic = () => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = !isMicOn;
+      });
+      setIsMicOn(!isMicOn);
+    }
+  };
+
+  const toggleCamera = () => {
+     if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = !isCameraOn;
+      });
+      setIsCameraOn(!isCameraOn);
+    }
+  };
 
   return (
     <div className="relative flex h-screen w-full flex-col bg-black text-white">
@@ -31,18 +92,26 @@ export default function ConsultationPage({ params }: { params: { id: string } })
             Dr. Emily Carter
           </div>
         </div>
-        <div className="relative overflow-hidden rounded-lg bg-gray-900">
-           {patientImage && (
-            <Image
-              src={patientImage.imageUrl}
-              alt={patientImage.description}
-              fill
-              className="object-cover"
-              data-ai-hint={patientImage.imageHint}
-            />
-          )}
+        <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
+           <video ref={videoRef} className="h-full w-full object-cover" autoPlay muted />
+            {!hasCameraPermission && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+                <Alert variant="destructive" className="max-w-sm">
+                  <AlertTitle>Camera Access Required</AlertTitle>
+                  <AlertDescription>
+                    Please allow camera access in your browser to use this feature. You may need to refresh the page after granting permission.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+            {hasCameraPermission && !isCameraOn && (
+               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+                  <VideoOff className="h-16 w-16 text-white/70" />
+                  <p className="mt-2 text-white/70">Your camera is off</p>
+               </div>
+            )}
           <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
-            You (Jane Doe)
+            You
           </div>
         </div>
       </div>
@@ -52,19 +121,19 @@ export default function ConsultationPage({ params }: { params: { id: string } })
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white">
-                  <Mic className="h-6 w-6" />
+                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white" onClick={toggleMic}>
+                  {isMicOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Mute</TooltipContent>
+              <TooltipContent>{isMicOn ? 'Mute' : 'Unmute'}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white">
-                  <Video className="h-6 w-6" />
+                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white" onClick={toggleCamera}>
+                   {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Stop Video</TooltipContent>
+              <TooltipContent>{isCameraOn ? 'Stop Video' : 'Start Video'}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
