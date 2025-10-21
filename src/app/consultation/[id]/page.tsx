@@ -93,6 +93,7 @@ export default function ConsultationPage({
               autoPlay
               loop
               muted
+              data-ai-hint={doctorVideo.imageHint}
             />
           )}
           <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
