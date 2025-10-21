@@ -26,14 +26,17 @@ import { updateProfile, verifyBeforeUpdateEmail } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { LoadingSpinner } from '@/components/loading-spinner';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useMemoFirebase } from '@/firebase/provider';
 
 const profileFormSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters.'),
   email: z.string().email(),
   phone: z.string().optional(),
+  // Patient specific
   dateOfBirth: z.string().optional(),
+  // Doctor specific
+  specialty: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -43,13 +46,35 @@ export default function ProfilePage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [userRole, setUserRole] = useState<'patient' | 'doctor' | null>(null);
 
   const patientDocRef = useMemoFirebase(
     () => (firestore && user ? doc(firestore, 'patients', user.uid) : null),
     [firestore, user]
   );
-  const { data: patientData, isLoading: isPatientDataLoading } =
-    useDoc(patientDocRef);
+  const { data: patientData, isLoading: isPatientDataLoading } = useDoc(patientDocRef, { enabled: userRole === 'patient' });
+
+  const doctorDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'doctors', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: doctorData, isLoading: isDoctorDataLoading } = useDoc(doctorDocRef, { enabled: userRole === 'doctor' });
+
+   const {data: initialPatientData, isLoading: isInitialPatientLoading} = useDoc(patientDocRef);
+   const {data: initialDoctorData, isLoading: isInitialDoctorLoading} = useDoc(doctorDocRef);
+
+
+  useEffect(() => {
+    if (initialPatientData) {
+      setUserRole('patient');
+    } else if (initialDoctorData) {
+      setUserRole('doctor');
+    }
+  }, [initialPatientData, initialDoctorData]);
+
+
+  const userData = userRole === 'patient' ? patientData : doctorData;
+  const isDataLoading = isPatientDataLoading || isDoctorDataLoading || (isInitialDoctorLoading && isInitialPatientLoading);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -58,50 +83,67 @@ export default function ProfilePage() {
       email: '',
       phone: '',
       dateOfBirth: '',
+      specialty: '',
     },
   });
 
   useEffect(() => {
-    if (user) {
+    if (user && userData) {
       form.reset({
         fullName: user.displayName || '',
         email: user.email || '',
-        phone: (patientData as any)?.phone || '',
-        dateOfBirth: (patientData as any)?.dateOfBirth || '',
+        phone: (userData as any)?.phone || '',
+        dateOfBirth: (userData as any)?.dateOfBirth || '',
+        specialty: (userData as any)?.specialty || '',
       });
+    } else if (user) {
+        form.reset({
+            fullName: user.displayName || '',
+            email: user.email || '',
+        })
     }
-  }, [user, patientData, form]);
+  }, [user, userData, form]);
 
   async function onSubmit(data: ProfileFormValues) {
-    if (!user || !firestore || !auth.currentUser) return;
+    if (!user || !firestore || !auth.currentUser || !userRole) return;
 
     try {
       // Update Firebase Auth display name
       if (data.fullName !== user.displayName) {
         await updateProfile(auth.currentUser, { displayName: data.fullName });
       }
-      
+
       // Update Firebase Auth email
       if (data.email !== user.email) {
         await verifyBeforeUpdateEmail(auth.currentUser, data.email);
         toast({
-            title: 'Verification Email Sent',
-            description: `A verification link has been sent to ${data.email}. Please check your inbox to confirm the change.`,
+          title: 'Verification Email Sent',
+          description: `A verification link has been sent to ${data.email}. Please check your inbox to confirm the change.`,
         });
       }
 
-
-      // Update Firestore patient document
+      // Update Firestore document
       const [firstName, ...lastNameParts] = data.fullName.split(' ');
-      const patientDocData = {
+      const commonData = {
         firstName,
         lastName: lastNameParts.join(' '),
         email: data.email,
         phone: data.phone,
-        dateOfBirth: data.dateOfBirth,
       };
 
-      setDocumentNonBlocking(patientDocRef!, patientDocData, { merge: true });
+      if (userRole === 'patient') {
+        const patientDocData = {
+          ...commonData,
+          dateOfBirth: data.dateOfBirth,
+        };
+        setDocumentNonBlocking(patientDocRef!, patientDocData, { merge: true });
+      } else if (userRole === 'doctor') {
+        const doctorDocData = {
+          ...commonData,
+          specialty: data.specialty,
+        };
+        setDocumentNonBlocking(doctorDocRef!, doctorDocData, { merge: true });
+      }
 
       toast({
         title: 'Profile Updated',
@@ -112,17 +154,32 @@ export default function ProfilePage() {
       toast({
         variant: 'destructive',
         title: 'Update Failed',
-        description: error.message || 'An unexpected error occurred. You may need to sign out and sign back in to change your email.',
+        description:
+          error.message ||
+          'An unexpected error occurred. You may need to sign out and sign back in to change your email.',
       });
     }
   }
 
-  if (isUserLoading || isPatientDataLoading) {
+  if (isUserLoading || isDataLoading) {
     return (
       <div className="flex h-full items-center justify-center">
         <LoadingSpinner />
       </div>
     );
+  }
+  
+  if (!userRole && !isDataLoading) {
+      return (
+        <div className="flex h-full items-center justify-center">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Profile Not Found</CardTitle>
+                    <CardDescription>We couldn&apos;t find a profile for your user.</CardDescription>
+                </CardHeader>
+            </Card>
+        </div>
+      )
   }
 
   return (
@@ -140,7 +197,8 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle>Personal Details</CardTitle>
           <CardDescription>
-            Update your information below. To change your email, you will be sent a verification link.
+            Update your information below. To change your email, you will be
+            sent a verification link.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -186,19 +244,36 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="dateOfBirth"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date of Birth</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {userRole === 'patient' && (
+                  <FormField
+                    control={form.control}
+                    name="dateOfBirth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date of Birth</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                 {userRole === 'doctor' && (
+                  <FormField
+                    control={form.control}
+                    name="specialty"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Specialty</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Cardiology" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
               <Button type="submit" disabled={form.formState.isSubmitting}>

@@ -24,6 +24,10 @@ export interface UseDocResult<T> {
   error: FirestoreError | Error | null; // Error object, or null.
 }
 
+type UseDocOptions = {
+    enabled?: boolean;
+}
+
 /**
  * React hook to subscribe to a single Firestore document in real-time.
  * Handles nullable references.
@@ -36,19 +40,21 @@ export interface UseDocResult<T> {
  * @template T Optional type for document data. Defaults to any.
  * @param {DocumentReference<DocumentData> | null | undefined} docRef -
  * The Firestore DocumentReference. Waits if null/undefined.
+ * @param {UseDocOptions} options - Options for the hook.
  * @returns {UseDocResult<T>} Object with data, isLoading, error.
  */
 export function useDoc<T = any>(
   memoizedDocRef: (DocumentReference<DocumentData> & {__memo?: boolean}) | null | undefined,
+  options: UseDocOptions = { enabled: true }
 ): UseDocResult<T> {
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(options.enabled);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    if (!memoizedDocRef) {
+    if (!memoizedDocRef || !options.enabled) {
       setData(null);
       setIsLoading(false);
       setError(null);
@@ -87,9 +93,9 @@ export function useDoc<T = any>(
     );
 
     return () => unsubscribe();
-  }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
+  }, [memoizedDocRef, options.enabled]); // Re-run if the memoizedDocRef or enabled status changes.
 
-  if (memoizedDocRef && !(memoizedDocRef as any).__memo) {
+  if (memoizedDocRef && !(memoizedDocRef as any).__memo && options.enabled) {
     throw new Error('The document reference passed to useDoc was not memoized with useMemoFirebase. This will cause infinite loops.');
   }
 
