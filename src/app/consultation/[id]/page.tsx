@@ -137,7 +137,7 @@ export default function ConsultationPage({
           {!isCameraOn && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
               <VideoOff className="h-16 w-16 text-white/70" />
-              <p className="mt-2 text-white/70">Your camera is off</p>
+              <p className="mt-2 text-white/70">camera is on but face is not visible</p>
             </div>
           )}
           <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
@@ -231,5 +231,3 @@ export default function ConsultationPage({
     </div>
   );
 }
-
-    
