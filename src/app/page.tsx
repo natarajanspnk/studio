@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Logo } from '@/components/logo';
 import { placeholderImages } from '@/lib/placeholder-images';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const features = [
   {
@@ -47,7 +48,8 @@ export default function Home() {
     <div className="flex min-h-screen flex-col">
       <header className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
         <Logo />
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" asChild>
             <Link href="/login">Login</Link>
           </Button>
@@ -98,7 +100,7 @@ export default function Home() {
 
         <section
           id="features"
-          className="w-full bg-white py-12 md:py-24 lg:py-32"
+          className="w-full bg-white py-12 md:py-24 lg:py-32 dark:bg-background"
         >
           <div className="container mx-auto px-4 md:px-6">
             <div className="mx-auto mb-12 max-w-2xl text-center">
@@ -114,7 +116,7 @@ export default function Home() {
               {features.map((feature) => (
                 <Card
                   key={feature.title}
-                  className="transform-gpu transition-all duration-300 hover:-translate-y-2 hover:shadow-xl"
+                  className="transform-gpu transition-all duration-300 hover:-translate-y-2 hover:shadow-xl dark:bg-card"
                 >
                   <CardHeader className="items-center">
                     {feature.icon}
@@ -156,7 +158,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="w-full bg-white py-6">
+      <footer className="w-full bg-white py-6 dark:bg-background">
         <div className="container mx-auto flex flex-col items-center justify-between px-4 md:flex-row md:px-6">
           <Logo />
           <p className="text-sm text-muted-foreground">
