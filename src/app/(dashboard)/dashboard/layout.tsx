@@ -32,16 +32,21 @@ import { signOut } from 'firebase/auth';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
 const navItems = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   {
     href: '/dashboard/symptom-checker',
-    icon: Stethoscope,
     label: 'Symptom Checker',
+    icon: Stethoscope,
   },
-  { href: '/dashboard/appointments', icon: Calendar, label: 'Appointments' },
-  { href: '/dashboard/records', icon: FileText, label: 'Health Records' },
-  { href: '/dashboard/consultations', icon: Video, label: 'Consultations' },
-  { href: '/dashboard/staff', icon: Users, label: 'Staff' },
+  { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
+  { href: '/dashboard/records', label: 'Health Records', icon: FileText },
+  { href: '/dashboard/consultations', label: 'Consultations', icon: Video },
+  { href: '/dashboard/staff', label: 'Staff', icon: Users },
+];
+
+const settingsNavItems = [
+  { href: '/dashboard/profile', label: 'Profile', icon: Users },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function DashboardLayout({
@@ -75,6 +80,10 @@ export default function DashboardLayout({
     );
   }
 
+  const isSettingsActive = settingsNavItems.some((item) =>
+    pathname.startsWith(item.href)
+  );
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -102,8 +111,12 @@ export default function DashboardLayout({
         <SidebarFooter className="flex-col gap-1">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Settings">
-                <Link href="#">
+              <SidebarMenuButton
+                asChild
+                tooltip="Settings"
+                isActive={isSettingsActive}
+              >
+                <Link href="/dashboard/settings">
                   <Settings />
                   <span>Settings</span>
                 </Link>
@@ -124,6 +137,9 @@ export default function DashboardLayout({
             <SidebarTrigger className="md:hidden" />
             <h1 className="font-headline text-xl font-semibold">
               {navItems.find((item) => pathname.startsWith(item.href))?.label ||
+                settingsNavItems.find((item) =>
+                  pathname.startsWith(item.href)
+                )?.label ||
                 'MedConnect'}
             </h1>
           </div>
