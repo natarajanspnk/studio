@@ -42,6 +42,7 @@ export default function ConsultationPage({
     }
 
     return () => {
+      // This cleanup ensures the camera/mic are turned off when the user leaves the page.
       if (mediaStream) {
         mediaStream.getTracks().forEach((track) => track.stop());
       }
@@ -71,6 +72,7 @@ export default function ConsultationPage({
     }
   };
 
+  // Render the preview component if the call has not been joined yet.
   if (!callJoined) {
     return (
       <ConsultationPreview
@@ -82,7 +84,8 @@ export default function ConsultationPage({
       />
     );
   }
-
+  
+  // Render the main call UI once the call is joined.
   return (
     <div className="relative flex h-screen w-full flex-col bg-black text-white">
       <div className="grid flex-1 grid-cols-1 grid-rows-2 gap-2 p-2 lg:grid-cols-2 lg:grid-rows-1">

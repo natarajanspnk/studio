@@ -47,7 +47,7 @@ export function ConsultationPreview({
           videoRef.current.srcObject = stream;
         }
         setHasPermission(true);
-        // Apply initial mic/camera state
+        // Apply initial mic/camera state that was passed from the parent
         stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
         stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
 
@@ -68,12 +68,16 @@ export function ConsultationPreview({
     getMedia();
 
     return () => {
-      // Stop tracks when component unmounts if call wasn't joined
-      if (streamRef.current) {
+      // Stop tracks when component unmounts *if* the call was not joined.
+      // If the call was joined, the parent component will handle stopping the stream.
+      if (streamRef.current && !videoRef.current?.srcObject) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [toast, isMicOn, isCameraOn]);
+  // We only want to run this once on mount, so we pass an empty dependency array.
+  // The isMicOn/isCameraOn props are only for initial state.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleMic = () => {
     if (streamRef.current) {
@@ -97,6 +101,7 @@ export function ConsultationPreview({
 
   const handleJoin = () => {
     if (streamRef.current) {
+      // Pass the active stream to the parent component to use in the call
       onJoinCall(streamRef.current);
     }
   };
