@@ -1,7 +1,6 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -9,12 +8,24 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Moon, Sun, Monitor } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { useEffect, useState } from 'react';
 
 export default function SettingsPage() {
-  const { setTheme, theme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
+  useEffect(() => {
+    setIsDarkMode(resolvedTheme === 'dark');
+  }, [resolvedTheme]);
+
+  const toggleTheme = (checked: boolean) => {
+    const newTheme = checked ? 'dark' : 'light';
+    setTheme(newTheme);
+    setIsDarkMode(checked);
+  };
+  
   return (
     <div className="max-w-3xl mx-auto space-y-8">
       <div>
@@ -36,36 +47,17 @@ export default function SettingsPage() {
         <CardContent>
           <div className="grid gap-4">
             <div className="flex items-center justify-between">
-              <Label htmlFor="theme-selector">Theme</Label>
-              <div
-                id="theme-selector"
-                className="flex items-center gap-2 rounded-lg border p-1"
-              >
-                <Button
-                  variant={theme === 'light' ? 'secondary' : 'ghost'}
-                  size="icon"
-                  onClick={() => setTheme('light')}
-                >
-                  <Sun className="h-5 w-5" />
-                  <span className="sr-only">Light</span>
-                </Button>
-                <Button
-                  variant={theme === 'dark' ? 'secondary' : 'ghost'}
-                  size="icon"
-                  onClick={() => setTheme('dark')}
-                >
-                  <Moon className="h-5 w-5" />
-                  <span className="sr-only">Dark</span>
-                </Button>
-                <Button
-                  variant={theme === 'system' ? 'secondary' : 'ghost'}
-                  size="icon"
-                  onClick={() => setTheme('system')}
-                >
-                  <Monitor className="h-5 w-5" />
-                  <span className="sr-only">System</span>
-                </Button>
-              </div>
+              <Label htmlFor="dark-mode-switch" className="flex flex-col gap-1">
+                <span>Dark Mode</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  Enable to switch to a darker theme.
+                </span>
+              </Label>
+               <Switch
+                id="dark-mode-switch"
+                checked={isDarkMode}
+                onCheckedChange={toggleTheme}
+              />
             </div>
           </div>
         </CardContent>
