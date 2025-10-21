@@ -27,7 +27,7 @@
     {
       "id": "doctor-3",
       "description": "Portrait of Dr. Chloe Davis.",
-      "imageUrl": "https://images.unsplash.com/photo-1730597842283-943c7986ee2c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxkb2N0b3IlMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjA3MzI4MDh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://images.unsplash.com/photo-1730597842283-943c7986ee2c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxkb2N0b3IlMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjA3MzI4MDh8MA&ixlib-rb-4.1.0&q=80&w=1080",
       "imageHint": "doctor portrait"
     },
     {
@@ -37,10 +37,10 @@
       "imageHint": "person video"
     },
     {
-      "id": "consultation-doctor",
-      "description": "A doctor participating in a video call.",
-      "imageUrl": "https://images.unsplash.com/photo-1559840251-2a04897f8559?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxkb2N0b3IlMjB2aWRlb3xlbnwwfHx8fDE3NjA3NjYzNzJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      "imageHint": "doctor video"
+      "id": "consultation-doctor-video",
+      "description": "A doctor participating in a video call, represented by a video.",
+      "imageUrl": "https://videos.pexels.com/video-files/8754774/8754774-hd_1080_1920_25fps.mp4",
+      "imageHint": "doctor video call"
     }
   ]
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import {
   Mic,
   MicOff,
@@ -27,22 +26,21 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
-  const doctorImage = placeholderImages.find(
-    (img) => img.id === 'consultation-doctor'
+  const doctorVideo = placeholderImages.find(
+    (img) => img.id === 'consultation-doctor-video'
   );
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [callJoined, setCallJoined] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const patientVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (callJoined && mediaStream && videoRef.current) {
-      videoRef.current.srcObject = mediaStream;
+    if (callJoined && mediaStream && patientVideoRef.current) {
+      patientVideoRef.current.srcObject = mediaStream;
     }
 
     return () => {
-      // This cleanup ensures the camera/mic are turned off when the user leaves the page.
       if (mediaStream) {
         mediaStream.getTracks().forEach((track) => track.stop());
       }
@@ -72,7 +70,6 @@ export default function ConsultationPage({
     }
   };
 
-  // Render the preview component if the call has not been joined yet.
   if (!callJoined) {
     return (
       <ConsultationPreview
@@ -84,19 +81,18 @@ export default function ConsultationPage({
       />
     );
   }
-  
-  // Render the main call UI once the call is joined.
+
   return (
     <div className="relative flex h-screen w-full flex-col bg-black text-white">
       <div className="grid flex-1 grid-cols-1 grid-rows-2 gap-2 p-2 lg:grid-cols-2 lg:grid-rows-1">
-        <div className="relative overflow-hidden rounded-lg bg-gray-900">
-          {doctorImage && (
-            <Image
-              src={doctorImage.imageUrl}
-              alt={doctorImage.description}
-              fill
-              className="object-cover"
-              data-ai-hint={doctorImage.imageHint}
+        <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
+          {doctorVideo && (
+            <video
+              src={doctorVideo.imageUrl}
+              className="h-full w-full object-cover"
+              autoPlay
+              loop
+              muted
             />
           )}
           <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
@@ -105,7 +101,7 @@ export default function ConsultationPage({
         </div>
         <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
           <video
-            ref={videoRef}
+            ref={patientVideoRef}
             className="h-full w-full -scale-x-100 object-cover"
             autoPlay
             muted
