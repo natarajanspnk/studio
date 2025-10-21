@@ -163,7 +163,7 @@ export default function SignupPage() {
               name="role"
               render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel>I want to sign up as a...</FormLabel>
+                  <FormLabel>Are you a ?!</FormLabel>
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}

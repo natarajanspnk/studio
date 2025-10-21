@@ -83,7 +83,9 @@ export default function LoginPage() {
   return (
     <Card>
       <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
+        <CardTitle className="text-3xl font-bold text-card-foreground">
+          Welcome Back
+        </CardTitle>
         <CardDescription>
           Enter your email below to login to your account
         </CardDescription>
@@ -96,7 +98,7 @@ export default function LoginPage() {
               name="role"
               render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel>I am a...</FormLabel>
+                  <FormLabel>Are you a ?!</FormLabel>
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
