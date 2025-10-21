@@ -107,7 +107,7 @@ export default function ConsultationPage({
   return (
     <div className="relative flex h-screen w-full flex-col bg-black text-white">
       {/* Main video grid */}
-      <div className="grid flex-1 grid-cols-1 grid-rows-2 gap-2 p-2 lg:grid-cols-2 lg:grid-rows-1">
+      <div className="grid flex-1 grid-cols-1 gap-2 p-2 md:grid-cols-2">
         {/* Remote video (Doctor/Other person) */}
         <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
            <video
@@ -133,6 +133,7 @@ export default function ConsultationPage({
             className="h-full w-full -scale-x-100 object-cover"
             autoPlay
             muted
+            playsInline
           />
           {!isCameraOn && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
