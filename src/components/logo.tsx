@@ -29,7 +29,7 @@ export function Logo({ className, isDashboard = false }: LogoProps) {
           )}
         />
       </div>
-      <span className="font-headline">MediConnect</span>
+      <span className="font-headline">MedConnect</span>
     </Link>
   );
 }

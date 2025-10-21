@@ -124,7 +124,7 @@ export default function DashboardLayout({
             <SidebarTrigger className="md:hidden" />
             <h1 className="font-headline text-xl font-semibold">
               {navItems.find((item) => pathname.startsWith(item.href))?.label ||
-                'MediConnect'}
+                'MedConnect'}
             </h1>
           </div>
           <UserNav />

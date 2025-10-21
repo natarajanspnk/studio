@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'MediConnect',
+  title: 'MedConnect: Your Health, Connected.',
   description:
-    'A Telemedicine Platform for secure patient-doctor communication.',
+    'MedConnect offers seamless, secure, and personalized telemedicine services. Connect with trusted healthcare professionals from the comfort of your home.',
 };
 
 export default function RootLayout({

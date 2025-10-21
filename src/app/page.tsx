@@ -67,7 +67,7 @@ export default function Home() {
                 Connected.
               </h1>
               <p className="max-w-[600px] text-lg text-muted-foreground md:text-xl">
-                MediConnect offers seamless, secure, and personalized
+                MedConnect offers seamless, secure, and personalized
                 telemedicine services. Connect with trusted healthcare
                 professionals from the comfort of your home.
               </p>
@@ -106,7 +106,7 @@ export default function Home() {
                 Comprehensive Care at Your Fingertips
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
-                MediConnect is designed to provide a complete virtual care
+                MedConnect is designed to provide a complete virtual care
                 experience.
               </p>
             </div>
@@ -160,7 +160,7 @@ export default function Home() {
         <div className="container mx-auto flex flex-col items-center justify-between px-4 md:flex-row md:px-6">
           <Logo />
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} MediConnect. All rights reserved.
+            &copy; {new Date().getFullYear()} MedConnect. All rights reserved.
           </p>
         </div>
       </footer>
