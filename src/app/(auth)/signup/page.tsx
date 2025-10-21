@@ -23,12 +23,14 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useFirestore, useUser } from '@/firebase';
 import { initiateEmailSignUp } from '@/firebase/non-blocking-login';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
 import { updateProfile } from 'firebase/auth';
 import { LoadingSpinner } from '@/components/loading-spinner';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, doc } from 'firebase/firestore';
 
 const formSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name.'),
@@ -38,6 +40,7 @@ const formSchema = z.object({
 
 export default function SignupPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
@@ -73,18 +76,35 @@ export default function SignupPage() {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
-      if (currentUser && form.formState.isSubmitSuccessful) {
+      if (currentUser && form.formState.isSubmitSuccessful && firestore) {
         try {
+          // Update Auth Profile
           await updateProfile(currentUser, {
             displayName: form.getValues('fullName'),
           });
+
+          // Create Patient document in Firestore
+          const [firstName, ...lastNameParts] = form.getValues('fullName').split(' ');
+          const patientRef = doc(firestore, 'patients', currentUser.uid);
+          const patientData = {
+            id: currentUser.uid,
+            firstName,
+            lastName: lastNameParts.join(' '),
+            email: currentUser.email,
+            dateOfBirth: '',
+            gender: '',
+            phone: '',
+            address: ''
+          };
+          setDocumentNonBlocking(patientRef, patientData, { merge: true });
+
         } catch (error) {
-          console.error("Failed to update profile", error);
+          console.error("Failed to update profile or create patient document", error);
         }
       }
     });
     return () => unsubscribe();
-  }, [auth, form]);
+  }, [auth, form, firestore]);
 
 
   if (isUserLoading || user) {
