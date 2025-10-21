@@ -2,7 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, MessageSquare } from 'lucide-react';
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  PhoneOff,
+  Users,
+  MessageSquare,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { placeholderImages } from '@/lib/placeholder-images';
 import Link from 'next/link';
@@ -12,53 +20,42 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ConsultationPreview } from './preview';
 
-export default function ConsultationPage({ params }: { params: { id: string } }) {
-  const doctorImage = placeholderImages.find((img) => img.id === 'consultation-doctor');
-  const [hasCameraPermission, setHasCameraPermission] = useState(false);
+export default function ConsultationPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const doctorImage = placeholderImages.find(
+    (img) => img.id === 'consultation-doctor'
+  );
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+  const [callJoined, setCallJoined] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { toast } = useToast();
 
   useEffect(() => {
-    const getCameraPermission = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        setHasCameraPermission(true);
-        setIsCameraOn(true);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        setIsCameraOn(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings to use this app.',
-        });
-      }
-    };
-
-    getCameraPermission();
+    if (callJoined && mediaStream && videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+    }
 
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
       }
-    }
-  }, [toast]);
+    };
+  }, [callJoined, mediaStream]);
+
+  const handleJoinCall = (stream: MediaStream) => {
+    setMediaStream(stream);
+    setCallJoined(true);
+  };
 
   const toggleMic = () => {
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getAudioTracks().forEach(track => {
+    if (mediaStream) {
+      mediaStream.getAudioTracks().forEach((track) => {
         track.enabled = !isMicOn;
       });
       setIsMicOn(!isMicOn);
@@ -66,14 +63,25 @@ export default function ConsultationPage({ params }: { params: { id: string } })
   };
 
   const toggleCamera = () => {
-     if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getVideoTracks().forEach(track => {
+    if (mediaStream) {
+      mediaStream.getVideoTracks().forEach((track) => {
         track.enabled = !isCameraOn;
       });
       setIsCameraOn(!isCameraOn);
     }
   };
+
+  if (!callJoined) {
+    return (
+      <ConsultationPreview
+        onJoinCall={handleJoinCall}
+        isMicOn={isMicOn}
+        isCameraOn={isCameraOn}
+        setIsMicOn={setIsMicOn}
+        setIsCameraOn={setIsCameraOn}
+      />
+    );
+  }
 
   return (
     <div className="relative flex h-screen w-full flex-col bg-black text-white">
@@ -93,23 +101,18 @@ export default function ConsultationPage({ params }: { params: { id: string } })
           </div>
         </div>
         <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
-           <video ref={videoRef} className="h-full w-full object-cover" autoPlay muted />
-            {!hasCameraPermission && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-                <Alert variant="destructive" className="max-w-sm">
-                  <AlertTitle>Camera Access Required</AlertTitle>
-                  <AlertDescription>
-                    Please allow camera access in your browser to use this feature. You may need to refresh the page after granting permission.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            )}
-            {hasCameraPermission && !isCameraOn && (
-               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-                  <VideoOff className="h-16 w-16 text-white/70" />
-                  <p className="mt-2 text-white/70">Your camera is off</p>
-               </div>
-            )}
+          <video
+            ref={videoRef}
+            className="h-full w-full -scale-x-100 object-cover"
+            autoPlay
+            muted
+          />
+          {!isCameraOn && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+              <VideoOff className="h-16 w-16 text-white/70" />
+              <p className="mt-2 text-white/70">Your camera is off</p>
+            </div>
+          )}
           <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
             You
           </div>
@@ -121,31 +124,59 @@ export default function ConsultationPage({ params }: { params: { id: string } })
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white" onClick={toggleMic}>
-                  {isMicOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-full text-white hover:bg-white/10 hover:text-white"
+                  onClick={toggleMic}
+                >
+                  {isMicOn ? (
+                    <Mic className="h-6 w-6" />
+                  ) : (
+                    <MicOff className="h-6 w-6" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{isMicOn ? 'Mute' : 'Unmute'}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white" onClick={toggleCamera}>
-                   {isCameraOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-full text-white hover:bg-white/10 hover:text-white"
+                  onClick={toggleCamera}
+                >
+                  {isCameraOn ? (
+                    <Video className="h-6 w-6" />
+                  ) : (
+                    <VideoOff className="h-6 w-6" />
+                  )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{isCameraOn ? 'Stop Video' : 'Start Video'}</TooltipContent>
+              <TooltipContent>
+                {isCameraOn ? 'Stop Video' : 'Start Video'}
+              </TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-full text-white hover:bg-white/10 hover:text-white"
+                >
                   <MessageSquare className="h-6 w-6" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Chat</TooltipContent>
             </Tooltip>
-             <Tooltip>
+            <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 text-white hover:bg-white/10 hover:text-white">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 rounded-full text-white hover:bg-white/10 hover:text-white"
+                >
                   <Users className="h-6 w-6" />
                 </Button>
               </TooltipTrigger>
@@ -153,10 +184,15 @@ export default function ConsultationPage({ params }: { params: { id: string } })
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button asChild variant="destructive" size="icon" className="rounded-full h-12 w-12">
-                   <Link href="/dashboard">
-                     <PhoneOff className="h-6 w-6" />
-                   </Link>
+                <Button
+                  asChild
+                  variant="destructive"
+                  size="icon"
+                  className="h-12 w-12 rounded-full"
+                >
+                  <Link href="/dashboard">
+                    <PhoneOff className="h-6 w-6" />
+                  </Link>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>End Call</TooltipContent>
