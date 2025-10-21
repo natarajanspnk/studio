@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,16 +13,23 @@ import {
 import { ArrowRight, Calendar, Plus, Stethoscope, Video } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { placeholderImages } from '@/lib/placeholder-images';
+import { useUser } from '@/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
+  const { user, isUserLoading } = useUser();
   const doctorAvatar = placeholderImages.find((img) => img.id === 'doctor-1');
 
   return (
     <div className="grid gap-8">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight font-headline">
-          Welcome back, Jane!
-        </h2>
+        {isUserLoading ? (
+          <Skeleton className="h-9 w-64" />
+        ) : (
+          <h2 className="font-headline text-3xl font-bold tracking-tight">
+            Welcome back, {user?.displayName?.split(' ')[0] || 'User'}!
+          </h2>
+        )}
         <p className="text-muted-foreground">
           Here&apos;s a quick overview of your health dashboard.
         </p>
