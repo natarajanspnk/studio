@@ -26,12 +26,14 @@ import {
 } from '@/components/ui/sidebar';
 import { Logo } from '@/components/logo';
 import { UserNav } from '@/components/user-nav';
-import { useAuth, useUser } from '@/firebase';
-import { useEffect } from 'react';
+import { useAuth, useDoc, useFirestore, useUser } from '@/firebase';
+import { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { LoadingSpinner } from '@/components/loading-spinner';
+import { useMemoFirebase } from '@/firebase/provider';
+import { doc } from 'firebase/firestore';
 
-const navItems = [
+const baseNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   {
     href: '/dashboard/symptom-checker',
@@ -41,7 +43,11 @@ const navItems = [
   { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
   { href: '/dashboard/records', label: 'Health Records', icon: FileText },
   { href: '/dashboard/consultations', label: 'Consultations', icon: Video },
-  { href: '/dashboard/staff', label: 'Staff', icon: Users },
+];
+
+const doctorNavItems = [
+    ...baseNavItems,
+    { href: '/dashboard/staff', label: 'Staff', icon: Users },
 ];
 
 const settingsNavItems = [
@@ -58,6 +64,30 @@ export default function DashboardLayout({
   const router = useRouter();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
+
+  const [userRole, setUserRole] = useState<'patient' | 'doctor' | null>(null);
+
+  const patientDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'patients', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: patientData, isLoading: isPatientDataLoading } = useDoc(patientDocRef);
+
+  const doctorDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'doctors', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: doctorData, isLoading: isDoctorDataLoading } = useDoc(doctorDocRef);
+
+
+  useEffect(() => {
+    if (patientData) {
+      setUserRole('patient');
+    } else if (doctorData) {
+      setUserRole('doctor');
+    }
+  }, [patientData, doctorData]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -71,8 +101,12 @@ export default function DashboardLayout({
       router.push('/');
     }
   };
+  
+  const navItems = userRole === 'doctor' ? doctorNavItems : baseNavItems;
+  const isLoading = isUserLoading || (user && !userRole && (isPatientDataLoading || isDoctorDataLoading));
 
-  if (isUserLoading || !user) {
+
+  if (isLoading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
         <LoadingSpinner />
