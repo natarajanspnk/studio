@@ -25,9 +25,9 @@ import {
 } from '@/components/ui/form';
 import { useAuth, useUser } from '@/firebase';
 import { initiateEmailSignIn } from '@/firebase/non-blocking-login';
-import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
 import { LoadingSpinner } from '@/components/loading-spinner';
+import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -56,16 +56,13 @@ export default function LoginPage() {
   }, [user, isUserLoading, router]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      initiateEmailSignIn(auth, values.email, values.password);
-      // Non-blocking, so we don't await. Redirection is handled by the useEffect and layout.
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description: error.message || 'An unexpected error occurred.',
-      });
-    }
+    initiateEmailSignIn(auth, values.email, values.password, (error) => {
+        toast({
+            variant: 'destructive',
+            title: 'Login Failed',
+            description: 'Invalid credentials. Please check your email and password.',
+        });
+    });
   }
 
   if (isUserLoading || user) {
