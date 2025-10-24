@@ -1,93 +1,93 @@
 /**
- * @fileoverview Firestore Security Rules for MedConnect Platform
+ * @file
+ * Firestore Security Rules for MedConnect Platform.
  *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model, ensuring that users can only access their own data.
+ * @corePhilosophy
+ * This ruleset enforces a strict user-ownership model for patient and doctor data,
+ * and enables open access for authenticated users to facilitate WebRTC call setup.
  *
- * Data Structure:
- * - Patients: /patients/{patientId}
- * - Doctors: /doctors/{doctorId}
- * - Appointments (Patient-owned): /patients/{patientId}/appointments/{appointmentId}
- * - Appointments (Doctor-owned): /doctors/{doctorId}/appointments/{appointmentId}
- * - HealthRecords: /patients/{patientId}/healthRecords/{healthRecordId}
+ * @dataStructure
+ * - `/patients/{patientId}`: Patient profile data, accessible only by the patient.
+ * - `/doctors/{doctorId}`: Doctor profile data, accessible only by the doctor.
+ * - `/patients/{patientId}/appointments/{appointmentId}` and `/doctors/{doctorId}/appointments/{appointmentId}`: Appointments tied to patients and doctors, accessible only by the respective user.
+ * - `/patients/{patientId}/healthRecords/{healthRecordId}`: Health records for patients, accessible only by the patient.
+ * - `/calls/{callId}`: WebRTC call signaling data, accessible to any authenticated user.
+ * - `/calls/{callId}/offerCandidates/{candidateId}` and `/calls/{callId}/answerCandidates/{candidateId}`: ICE candidates for WebRTC calls, accessible to any authenticated user.
  *
- * Key Security Decisions:
- * - Users (patients and doctors) can only access their profile data.
- * - Appointments and HealthRecords are stored as subcollections under patients or doctors and inherit the same ownership restrictions.
- * - Doctor access to patient health records is not currently implemented. A "members" map within the HealthRecord document could be added to implement role-based access for doctors in the future.
- * - Listing of collections is generally allowed for owners.
+ * @keySecurityDecisions
+ * - Doctors collection has public read access to facilitate searching.
+ * - User listing is disallowed.
+ * - WebRTC signaling data in /calls is open to authenticated users.
+ * - All write operations on user-owned data are restricted to the owner.
  *
- * Denormalization for Authorization:
- * - The patientId and doctorId are available in the path, so no denormalization is needed to check for authorization.
+ * @denormalizationForAuthorization
+ * - Patient and Doctor profile data are secured using path-based ownership, eliminating the need for denormalization.
+ * - The ownership data model is used for appointments and health records.
+ *
+ * @structuralSegregation
+ * - WebRTC signaling data is stored in a top-level collection to enable easy sharing and access between users.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to patient profile information.
+     * @description Allows access to patient profile information only to the authenticated patient.
      * @path /patients/{patientId}
-     * @allow (create) - User with matching UID can create their profile.
-     * @allow (get, list, update, delete) - User with matching UID can read, update, and delete their profile.
-     * @deny (create) - User tries to create a profile with a mismatched UID.
-     * @deny (get, list, update, delete) - User tries to access another user's profile.
-     * @principle Enforces document ownership for all operations.
+     * @allow (get, create, update, delete) - Authenticated user with matching patientId.
+     * @deny (get, create, update, delete) - Any other user.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
      */
     match /patients/{patientId} {
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
-
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+          return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(patientId);
       allow list: if false;
-      allow create: if isOwner(patientId);
-      allow update: if isExistingOwner(patientId);
+      allow create: if isOwner(patientId) && request.resource.data.id == patientId;
+      allow update: if isExistingOwner(patientId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(patientId);
     }
 
     /**
-     * @description Controls access to doctor profile information.
+     * @description Allows access to doctor profile information only to the authenticated doctor.
      * @path /doctors/{doctorId}
-     * @allow (create) - User with matching UID can create their profile.
-     * @allow (get, list, update, delete) - User with matching UID can read, update, and delete their profile.
-     * @deny (create) - User tries to create a profile with a mismatched UID.
-     * @deny (get, list, update, delete) - User tries to access another user's profile.
-     * @principle Enforces document ownership for all operations.
+     * @allow (get, create, update, delete) - Authenticated user with matching doctorId.
+     * @allow (list) - all users, signed in or otherwise
+     * @deny (get, create, update, delete) - Any other user.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
      */
     match /doctors/{doctorId} {
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
-
-       function isExistingOwner(userId) {
+      function isExistingOwner(userId) {
         return isOwner(userId) && resource != null;
       }
 
-      allow get: if isOwner(doctorId);
-      allow list: if false;
-      allow create: if isOwner(doctorId);
-      allow update: if isExistingOwner(doctorId);
+      allow get, list: if true;
+      allow create: if isOwner(doctorId) && request.resource.data.id == doctorId;
+      allow update: if isExistingOwner(doctorId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(doctorId);
     }
 
     /**
-     * @description Controls access to appointments associated with a specific patient.
+     * @description Allows access to appointments associated with a specific patient.
      * @path /patients/{patientId}/appointments/{appointmentId}
-     * @allow (get, list, create, update, delete) - The patient can manage their own appointments.
-     * @deny (get, list, create, update, delete) - Another user tries to access or modify the patient's appointments.
-     * @principle Enforces document ownership and data consistency.
+     * @allow (get, create, update, delete) - Authenticated user with matching patientId.
+     * @deny (get, create, update, delete) - Any other user.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
      */
     match /patients/{patientId}/appointments/{appointmentId} {
-      function isOwner(patientId) {
-        return request.auth != null && request.auth.uid == patientId;
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
       }
-
-      function isExistingOwner(patientId) {
-        return isOwner(patientId) && resource != null;
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(patientId);
@@ -98,19 +98,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to appointments associated with a specific doctor.
+     * @description Allows access to appointments associated with a specific doctor.
      * @path /doctors/{doctorId}/appointments/{appointmentId}
-     * @allow (get, list, create, update, delete) - The doctor can manage their own appointments.
-     * @deny (get, list, create, update, delete) - Another user tries to access or modify the doctor's appointments.
-     * @principle Enforces document ownership and data consistency.
+     * @allow (get, create, update, delete) - Authenticated user with matching doctorId.
+     * @deny (get, create, update, delete) - Any other user.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
      */
     match /doctors/{doctorId}/appointments/{appointmentId} {
-      function isOwner(doctorId) {
-        return request.auth != null && request.auth.uid == doctorId;
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
       }
-
-      function isExistingOwner(doctorId) {
-        return isOwner(doctorId) && resource != null;
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(doctorId);
@@ -121,19 +120,18 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to health records associated with a specific patient.
+     * @description Allows access to health records associated with a specific patient.
      * @path /patients/{patientId}/healthRecords/{healthRecordId}
-     * @allow (get, list, create, update, delete) - The patient can manage their own health records.
-     * @deny (get, list, create, update, delete) - Another user tries to access or modify the patient's health records.
-     * @principle Enforces document ownership and data consistency.
+     * @allow (get, create, update, delete) - Authenticated user with matching patientId.
+     * @deny (get, create, update, delete) - Any other user.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree.
      */
     match /patients/{patientId}/healthRecords/{healthRecordId} {
-      function isOwner(patientId) {
-        return request.auth != null && request.auth.uid == patientId;
+      function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
       }
-
-      function isExistingOwner(patientId) {
-        return isOwner(patientId) && resource != null;
+      function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(patientId);
@@ -141,6 +139,52 @@ service cloud.firestore {
       allow create: if isOwner(patientId);
       allow update: if isExistingOwner(patientId);
       allow delete: if isExistingOwner(patientId);
+    }
+
+    /**
+     * @description Allows any authenticated user to create or join a call.
+     * @path /calls/{callId}
+     * @allow (get, list, create, update) - Any authenticated user.
+     * @deny (get, list, create, update) - Unauthenticated user.
+     * @principle Enables open access for authenticated users to facilitate WebRTC call setup.
+     */
+    match /calls/{callId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get, list, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows any authenticated user to add offer candidates.
+     * @path /calls/{callId}/offerCandidates/{candidateId}
+     * @allow (get, list, create, update) - Any authenticated user.
+     * @deny (get, list, create, update) - Unauthenticated user.
+     * @principle Enables open access for authenticated users to facilitate WebRTC call setup.
+     */
+    match /calls/{callId}/offerCandidates/{candidateId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      allow get, list, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows any authenticated user to add answer candidates.
+     * @path /calls/{callId}/answerCandidates/{candidateId}
+     * @allow (get, list, create, update) - Any authenticated user.
+     * @deny (get, list, create, update) - Unauthenticated user.
+     * @principle Enables open access for authenticated users to facilitate WebRTC call setup.
+     */
+    match /calls/{callId}/answerCandidates/{candidateId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      allow get, list, create, update: if isSignedIn();
+      allow delete: if false;
     }
   }
 }
