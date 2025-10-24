@@ -16,6 +16,8 @@ import { placeholderImages } from '@/lib/placeholder-images';
 import { useUser } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// This is the Patient Dashboard
+
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
   const doctorAvatar = placeholderImages.find((img) => img.id === 'doctor-1');
@@ -31,7 +33,7 @@ export default function DashboardPage() {
           </h2>
         )}
         <p className="text-muted-foreground">
-          Here&apos;s a quick overview of your health dashboard.
+          Here&apos;s a quick overview of your patient dashboard.
         </p>
       </div>
 

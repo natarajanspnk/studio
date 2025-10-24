@@ -1,6 +1,16 @@
 'use client';
 
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { useUser } from '@/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
+import { MoreHorizontal, PlusCircle, Users } from 'lucide-react';
+import {
   Table,
   TableBody,
   TableCell,
@@ -8,27 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
-import {
-  useCollection,
-  useFirestore,
-  useMemoFirebase,
-} from '@/firebase';
-import {
-  setDocumentNonBlocking,
-  deleteDocumentNonBlocking,
-} from '@/firebase/non-blocking-updates';
-import { collection, doc } from 'firebase/firestore';
-import { LoadingSpinner } from '@/components/loading-spinner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,7 +47,20 @@ import {
 import { useState } from 'react';
 import { DoctorForm, type DoctorFormValues } from './doctor-form';
 import { useToast } from '@/hooks/use-toast';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+} from '@/firebase';
+import {
+  setDocumentNonBlocking,
+  deleteDocumentNonBlocking,
+} from '@/firebase/non-blocking-updates';
+import { collection, doc } from 'firebase/firestore';
+import { LoadingSpinner } from '@/components/loading-spinner';
 import { WithId } from '@/firebase/firestore/use-collection';
+
+// This is now the Doctor Dashboard
 
 export type Doctor = {
   firstName: string;
@@ -69,6 +73,8 @@ export type Doctor = {
 };
 
 export default function StaffPage() {
+  const { user, isUserLoading } = useUser();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<WithId<Doctor> | null>(
@@ -140,17 +146,21 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="grid gap-8">
       <div>
-        <h2 className="font-headline text-3xl font-bold tracking-tight">
-          Staff Management
-        </h2>
-        <p className="mt-2 text-muted-foreground">
-          View, add, edit, or remove doctors from the platform.
+        {isUserLoading ? (
+          <Skeleton className="h-9 w-64" />
+        ) : (
+          <h2 className="font-headline text-3xl font-bold tracking-tight">
+            Doctor Dashboard
+          </h2>
+        )}
+        <p className="text-muted-foreground">
+          Here&apos;s a quick overview of your professional dashboard.
         </p>
       </div>
 
-      <Dialog
+       <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
@@ -162,7 +172,7 @@ export default function StaffPage() {
             <div>
               <CardTitle>Doctor Roster</CardTitle>
               <CardDescription>
-                The list of all doctors currently on the platform.
+                Manage the list of all doctors on the platform.
               </CardDescription>
             </div>
             <DialogTrigger asChild>
@@ -277,6 +287,7 @@ export default function StaffPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
   );
 }

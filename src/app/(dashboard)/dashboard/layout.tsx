@@ -33,7 +33,7 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { useMemoFirebase } from '@/firebase/provider';
 import { doc } from 'firebase/firestore';
 
-const baseNavItems = [
+const patientNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   {
     href: '/dashboard/symptom-checker',
@@ -46,13 +46,10 @@ const baseNavItems = [
 ];
 
 const doctorNavItems = [
-    ...baseNavItems,
-    { href: '/dashboard/staff', label: 'Staff', icon: Users },
-];
-
-const settingsNavItems = [
-  { href: '/dashboard/profile', label: 'Profile', icon: Users },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+    { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
+    { href: '/dashboard/consultations', label: 'Consultations', icon: Video },
+    { href: '/dashboard/records', label: 'Patient Records', icon: FileText },
 ];
 
 export default function DashboardLayout({
@@ -82,18 +79,29 @@ export default function DashboardLayout({
 
 
   useEffect(() => {
-    if (patientData) {
-      setUserRole('patient');
-    } else if (doctorData) {
-      setUserRole('doctor');
-    }
-  }, [patientData, doctorData]);
-
-  useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/login');
     }
   }, [user, isUserLoading, router]);
+  
+  useEffect(() => {
+    if (isPatientDataLoading || isDoctorDataLoading) return;
+
+    if (patientData) {
+      setUserRole('patient');
+      if (pathname.startsWith('/dashboard/staff')) {
+        router.replace('/dashboard');
+      }
+    } else if (doctorData) {
+      setUserRole('doctor');
+      if (!pathname.startsWith('/dashboard/staff') && pathname !== '/dashboard' && !['/dashboard/appointments', '/dashboard/consultations', '/dashboard/records', '/dashboard/profile', '/dashboard/settings'].includes(pathname) ) {
+         router.replace('/dashboard/staff');
+      } else if (pathname === '/dashboard') {
+        router.replace('/dashboard/staff');
+      }
+    }
+  }, [patientData, doctorData, isPatientDataLoading, isDoctorDataLoading, router, pathname]);
+
 
   const handleLogout = async () => {
     if (auth) {
@@ -102,9 +110,8 @@ export default function DashboardLayout({
     }
   };
   
-  const navItems = userRole === 'doctor' ? doctorNavItems : baseNavItems;
+  const navItems = userRole === 'doctor' ? doctorNavItems : patientNavItems;
   const isLoading = isUserLoading || (user && !userRole && (isPatientDataLoading || isDoctorDataLoading));
-
 
   if (isLoading || !user) {
     return (
@@ -114,9 +121,7 @@ export default function DashboardLayout({
     );
   }
 
-  const isSettingsActive = settingsNavItems.some((item) =>
-    pathname.startsWith(item.href)
-  );
+  const isSettingsActive = pathname.startsWith('/dashboard/settings') || pathname.startsWith('/dashboard/profile');
 
   return (
     <SidebarProvider>
@@ -171,10 +176,7 @@ export default function DashboardLayout({
             <SidebarTrigger className="md:hidden" />
             <h1 className="font-headline text-xl font-semibold">
               {navItems.find((item) => pathname.startsWith(item.href))?.label ||
-                settingsNavItems.find((item) =>
-                  pathname.startsWith(item.href)
-                )?.label ||
-                'MedConnect'}
+                (isSettingsActive ? (pathname.startsWith('/dashboard/profile') ? 'Profile' : 'Settings') : 'MedConnect')}
             </h1>
           </div>
           <UserNav />
