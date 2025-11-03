@@ -23,8 +23,11 @@ service cloud.firestore {
       allow write: if isDoctor();
 
       // Appointments subcollection for doctors
+      // Allow any signed-in user to create an appointment for a doctor.
+      // The doctor can read/delete their own appointments.
       match /appointments/{appointmentId} {
-        allow read, write: if isOwner(doctorId);
+        allow create: if isSignedIn();
+        allow read, delete: if isOwner(doctorId);
       }
     }
 
