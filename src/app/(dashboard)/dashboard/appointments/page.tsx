@@ -55,7 +55,6 @@ export default function AppointmentsPage() {
     time: string;
   } | null>(null);
   const [isBooking, setIsBooking] = useState(false);
-  const [openDialog, setOpenDialog] = useState(false);
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
@@ -128,13 +127,11 @@ export default function AppointmentsPage() {
     } finally {
         setIsBooking(false);
         setSelectedSlot(null);
-        setOpenDialog(false);
     }
   };
 
   const handleTriggerClick = (doctor: WithId<Doctor>, time: string) => {
     setSelectedSlot({ doctor, time });
-    setOpenDialog(true);
   };
 
 
@@ -149,7 +146,7 @@ export default function AppointmentsPage() {
           specialists.
         </p>
       </div>
-      <AlertDialog open={openDialog} onOpenChange={setOpenDialog}>
+      <AlertDialog>
         <div className="grid gap-8 lg:grid-cols-3">
           <Card className="lg:col-span-1">
             <CardHeader>
@@ -211,7 +208,7 @@ export default function AppointmentsPage() {
                         <AlertDialogTrigger asChild key={time}>
                            <Button
                             variant="outline"
-                            disabled={!doctor.isAvailable || isBooking}
+                            disabled={!doctor.isAvailable}
                             onClick={() => handleTriggerClick(doctor, time)}
                           >
                             {time}
