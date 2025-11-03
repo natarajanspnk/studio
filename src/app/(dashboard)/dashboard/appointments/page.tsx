@@ -71,97 +71,93 @@ export default function AppointmentsPage() {
           Select a date and choose an available time slot with one of our specialists.
         </p>
       </div>
+      <AlertDialog>
+        <div className="grid gap-8 lg:grid-cols-3">
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Select a Date</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                className="rounded-md border"
+                disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
+              />
+            </CardContent>
+          </Card>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Select a Date</CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              className="rounded-md border"
-              disabled={(d) => d < new Date(new Date().setHours(0,0,0,0))}
-            />
-          </CardContent>
-        </Card>
+          <div className="space-y-6 lg:col-span-2">
+            {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
+            {doctors?.map((doctor) => {
+              const avatar = placeholderImages.find(
+                (img) => img.id === `doctor-${doctor.id.slice(0,1)}`
+              ) || placeholderImages.find(img => img.id === 'doctor-1');
 
-        <div className="space-y-6 lg:col-span-2">
-           {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
-          {doctors?.map((doctor) => {
-            const avatar = placeholderImages.find(
-              (img) => img.id === `doctor-${doctor.id.slice(0,1)}`
-            ) || placeholderImages.find(img => img.id === 'doctor-1');
-
-            return (
-              <Card key={doctor.id}>
-                <CardHeader className="flex flex-row items-center gap-4 space-y-0">
-                   <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full">
-                    {avatar && (
-                       <Image
-                        src={avatar.imageUrl}
-                        alt={avatar.description}
-                        fill
-                        className="object-cover"
-                        data-ai-hint={avatar.imageHint}
-                      />
-                    )}
-                    <div className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-card ${doctor.isAvailable ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                  </div>
-                  <div>
-                    <CardTitle>Dr. {doctor.firstName} {doctor.lastName}</CardTitle>
-                    <CardDescription>{doctor.specialty}</CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <h4 className="mb-2 font-semibold">Available Slots</h4>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {timeSlots.map((time) => (
-                      <AlertDialogTrigger asChild key={time}>
-                        <Button
-                          variant="outline"
-                           disabled={!doctor.isAvailable}
-                          onClick={() => setSelectedSlot({ doctor, time })}
-                        >
-                          {time}
-                        </Button>
-                      </AlertDialogTrigger>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+              return (
+                <Card key={doctor.id}>
+                  <CardHeader className="flex flex-row items-center gap-4 space-y-0">
+                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full">
+                      {avatar && (
+                        <Image
+                          src={avatar.imageUrl}
+                          alt={avatar.description}
+                          fill
+                          className="object-cover"
+                          data-ai-hint={avatar.imageHint}
+                        />
+                      )}
+                      <div className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-card ${doctor.isAvailable ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    </div>
+                    <div>
+                      <CardTitle>Dr. {doctor.firstName} {doctor.lastName}</CardTitle>
+                      <CardDescription>{doctor.specialty}</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <h4 className="mb-2 font-semibold">Available Slots</h4>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                      {timeSlots.map((time) => (
+                        <AlertDialogTrigger asChild key={time}>
+                          <Button
+                            variant="outline"
+                            disabled={!doctor.isAvailable}
+                            onClick={() => setSelectedSlot({ doctor, time })}
+                          >
+                            {time}
+                          </Button>
+                        </AlertDialogTrigger>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
-      </div>
-       <AlertDialog
-        onOpenChange={(open) => !open && setSelectedSlot(null)}
-        open={selectedSlot !== null}
-       >
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Appointment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to book this appointment?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {selectedSlot && date && (
-            <div className="space-y-4 rounded-lg border p-4">
-               <div className="font-semibold">Appointment Details:</div>
-               <p><span className="font-medium">Doctor:</span> Dr. {selectedSlot.doctor.firstName} {selectedSlot.doctor.lastName} ({selectedSlot.doctor.specialty})</p>
-               <p><span className="font-medium">Date:</span> {date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-               <p><span className="font-medium">Time:</span> {selectedSlot.time}</p>
-            </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBookAppointment}>
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Appointment</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to book this appointment?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {selectedSlot && date && (
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="font-semibold">Appointment Details:</div>
+                <p><span className="font-medium">Doctor:</span> Dr. {selectedSlot.doctor.firstName} {selectedSlot.doctor.lastName} ({selectedSlot.doctor.specialty})</p>
+                <p><span className="font-medium">Date:</span> {date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                <p><span className="font-medium">Time:</span> {selectedSlot.time}</p>
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSelectedSlot(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleBookAppointment}>
+                Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
       </AlertDialog>
     </div>
   );
