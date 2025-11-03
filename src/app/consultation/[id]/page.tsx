@@ -23,7 +23,7 @@ import { useFirestore } from '@/firebase';
 import { createPeerConnection, startCall, joinCall } from '@/lib/webrtc';
 
 export default function ConsultationPage({
-  params,
+  params: { id },
 }: {
   params: { id: string };
 }) {
@@ -60,17 +60,17 @@ export default function ConsultationPage({
       return;
     }
 
-    createPeerConnection(firestore, params.id, setRemoteStream);
+    createPeerConnection(firestore, id, setRemoteStream);
 
     // This is a simplified logic. In a real app, you'd have a more robust
     // way to determine who is the caller and who is the joiner.
     // For this prototype, we'll assume the first person to arrive starts the call.
     // We can use a document existence check for this.
     try {
-        await startCall(firestore, params.id, stream);
+        await startCall(firestore, id, stream);
     } catch (e) {
         // If startCall fails (e.g., offer already exists), it means we are the joiner
-        await joinCall(firestore, params.id, stream);
+        await joinCall(firestore, id, stream);
     }
   };
 
