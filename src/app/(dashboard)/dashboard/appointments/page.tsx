@@ -25,11 +25,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { WithId } from '@/firebase/firestore/use-collection';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { serverTimestamp } from 'firebase/firestore';
 
 type Doctor = {
   id: string;
@@ -64,7 +63,7 @@ export default function AppointmentsPage() {
   );
   const { data: doctors, isLoading } = useCollection<Doctor>(doctorsCollection);
 
-  const handleBookAppointment = async () => {
+  const handleBookAppointment = () => {
     if (!selectedSlot || !date || !user || !firestore) {
       toast({
         variant: 'destructive',
@@ -87,7 +86,7 @@ export default function AppointmentsPage() {
     }
 
     appointmentDateTime.setHours(hours, minutes, 0, 0);
-    
+
     const appointmentId = doc(collection(firestore, 'id_generator')).id;
 
     const appointmentData = {
@@ -99,41 +98,48 @@ export default function AppointmentsPage() {
       status: 'scheduled',
       doctorName: `${selectedSlot.doctor.firstName} ${selectedSlot.doctor.lastName}`,
       doctorSpecialty: selectedSlot.doctor.specialty,
-      patientName: user.displayName || 'Unknown Patient'
+      patientName: user.displayName || 'Unknown Patient',
     };
 
     try {
-      const patientAppointmentRef = doc(firestore, 'patients', user.uid, 'appointments', appointmentId);
-      const doctorAppointmentRef = doc(firestore, 'doctors', selectedSlot.doctor.id, 'appointments', appointmentId);
-      
-      // Create appointment in both places
-      await Promise.all([
-        setDoc(patientAppointmentRef, appointmentData),
-        setDoc(doctorAppointmentRef, appointmentData),
-      ]);
+      const patientAppointmentRef = doc(
+        firestore,
+        'patients',
+        user.uid,
+        'appointments',
+        appointmentId
+      );
+      const doctorAppointmentRef = doc(
+        firestore,
+        'doctors',
+        selectedSlot.doctor.id,
+        'appointments',
+        appointmentId
+      );
 
+      // Non-blocking writes
+      setDocumentNonBlocking(patientAppointmentRef, appointmentData, { merge: true });
+      setDocumentNonBlocking(doctorAppointmentRef, appointmentData, { merge: true });
 
       toast({
         title: 'Appointment Booked!',
         description: `Your appointment with Dr. ${selectedSlot.doctor.firstName} ${selectedSlot.doctor.lastName} is confirmed.`,
       });
     } catch (error) {
-        console.error("Error booking appointment: ", error);
+      console.error('Error booking appointment: ', error);
       toast({
         variant: 'destructive',
         title: 'Booking Failed',
         description: 'Could not save the appointment. Please try again.',
       });
     } finally {
-        setIsBooking(false);
-        setSelectedSlot(null);
+      setIsBooking(false);
+      setSelectedSlot(null);
     }
   };
-
   const handleTriggerClick = (doctor: WithId<Doctor>, time: string) => {
     setSelectedSlot({ doctor, time });
   };
-
 
   return (
     <div className="space-y-8">
@@ -206,7 +212,7 @@ export default function AppointmentsPage() {
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                       {timeSlots.map((time) => (
                         <AlertDialogTrigger asChild key={time}>
-                           <Button
+                          <Button
                             variant="outline"
                             disabled={!doctor.isAvailable}
                             onClick={() => handleTriggerClick(doctor, time)}
@@ -234,8 +240,8 @@ export default function AppointmentsPage() {
               <div className="font-semibold">Appointment Details:</div>
               <p>
                 <span className="font-medium">Doctor:</span> Dr.{' '}
-                {selectedSlot.doctor.firstName} {selectedSlot.doctor.lastName} (
-                {selectedSlot.doctor.specialty})
+                {selectedSlot.doctor.firstName} {selectedSlot.doctor.lastName}{' '}
+                ({selectedSlot.doctor.specialty})
               </p>
               <p>
                 <span className="font-medium">Date:</span>{' '}
