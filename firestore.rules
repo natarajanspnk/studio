@@ -16,10 +16,11 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/doctors/$(request.auth.uid));
     }
 
-    // Doctors Collection: Allow any signed-in user to read/list, but only the owner to write.
+    // Doctors Collection: Allow any signed-in user to read/list.
+    // Allow any user who is a doctor to write to any doctor document.
     match /doctors/{doctorId} {
       allow read: if isSignedIn();
-      allow write: if isOwner(doctorId);
+      allow write: if isDoctor();
 
       // Appointments subcollection for doctors
       match /appointments/{appointmentId} {
@@ -30,7 +31,8 @@ service cloud.firestore {
     // Patients Collection: Allow doctors to list/read, but only the owner to write.
     match /patients/{patientId} {
       allow list: if isDoctor();
-      allow read, write: if isOwner(patientId);
+      allow read: if isOwner(patientId) || isDoctor();
+      allow write: if isOwner(patientId);
 
       // Subcollections for patients
       match /appointments/{appointmentId} {
