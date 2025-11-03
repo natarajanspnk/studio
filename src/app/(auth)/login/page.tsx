@@ -23,11 +23,13 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useDoc, useFirestore, useUser } from '@/firebase';
 import { initiateEmailSignIn } from '@/firebase/non-blocking-login';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
+import { useMemoFirebase } from '@/firebase/provider';
+import { doc } from 'firebase/firestore';
 
 const formSchema = z.object({
   email: z.string().email('Please enter a valid email address.'),
@@ -36,9 +38,11 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -48,12 +52,40 @@ export default function LoginPage() {
     },
   });
 
+  // Hooks to check for user documents
+  const patientDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'patients', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: patientData, isLoading: isPatientLoading } = useDoc(patientDocRef, { enabled: !!user });
+
+  const doctorDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'doctors', user.uid) : null),
+    [firestore, user]
+  );
+  const { data: doctorData, isLoading: isDoctorLoading } = useDoc(doctorDocRef, { enabled: !!user });
+
+
   useEffect(() => {
-    if (!isUserLoading && user) {
-      // The layout will handle role-based redirection.
+    // Don't do anything until we have a user and their role data has been checked.
+    if (isUserLoading || !user || isPatientLoading || isDoctorLoading) {
+      return;
+    }
+    
+    setIsRedirecting(true);
+
+    if (patientData) {
+      router.push('/dashboard');
+    } else if (doctorData) {
+      router.push('/dashboard/staff');
+    } else {
+      // Fallback in case the user has an auth record but no patient/doctor document.
+      // This could happen if the signup process was interrupted.
+      console.warn("User has no role document. Redirecting to generic dashboard.");
       router.push('/dashboard');
     }
-  }, [user, isUserLoading, router]);
+
+  }, [user, isUserLoading, patientData, doctorData, isPatientLoading, isDoctorLoading, router]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     initiateEmailSignIn(auth, values.email, values.password, (error) => {
@@ -65,12 +97,19 @@ export default function LoginPage() {
     });
   }
 
-  if (isUserLoading || user) {
+  // Show loading spinner if Firebase auth is loading, or if we have a user but are still determining their role.
+  if (isUserLoading || isRedirecting || (user && (isPatientLoading || isDoctorLoading))) {
     return (
       <div className="flex h-screen items-center justify-center">
         <LoadingSpinner />
       </div>
     );
+  }
+
+  // If we're done loading and there's a user, they will be redirected by the useEffect.
+  // This prevents the login form from flashing briefly. If no user, show the form.
+  if (user) {
+    return null;
   }
 
   return (
