@@ -1,3 +1,4 @@
+'use client';
 import Link from 'next/link';
 import {
   Table,
@@ -9,41 +10,50 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Video, ArrowRight } from 'lucide-react';
+import { Video, ArrowRight, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { LoadingSpinner } from '@/components/loading-spinner';
+import { format } from 'date-fns';
 
-const consultations = [
-  {
-    id: '123',
-    date: 'Tomorrow, at 10:30 AM',
-    doctor: 'Dr. Emily Carter',
-    specialty: 'Cardiologist',
-    status: 'Upcoming',
-  },
-  {
-    id: '456',
-    date: '2024-04-15',
-    doctor: 'Dr. Emily Carter',
-    specialty: 'Cardiologist',
-    status: 'Completed',
-  },
-  {
-    id: '789',
-    date: '2024-02-20',
-    doctor: 'Dr. Ben Adams',
-    specialty: 'Dermatologist',
-    status: 'Completed',
-  },
-  {
-    id: '101',
-    date: 'Next week, at 02:00 PM',
-    doctor: 'Dr. Chloe Davis',
-    specialty: 'Pediatrician',
-    status: 'Upcoming',
-  },
-];
+type Appointment = {
+  id: string;
+  dateTime: string;
+  doctorName: string;
+  doctorSpecialty: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+};
 
 export default function ConsultationsPage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const appointmentsCollectionRef = useMemoFirebase(
+    () => (user && firestore ? collection(firestore, 'patients', user.uid, 'appointments') : null),
+    [user, firestore]
+  );
+  
+  const appointmentsQuery = useMemoFirebase(
+      () => (appointmentsCollectionRef ? query(appointmentsCollectionRef, orderBy('dateTime', 'desc')) : null),
+      [appointmentsCollectionRef]
+  )
+
+  const { data: appointments, isLoading } = useCollection<Appointment>(appointmentsQuery);
+
+  const getStatusVariant = (status: Appointment['status']) => {
+    switch (status) {
+      case 'scheduled':
+        return 'default';
+      case 'completed':
+        return 'secondary';
+      case 'cancelled':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -63,48 +73,61 @@ export default function ConsultationsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date & Time</TableHead>
-                <TableHead>Doctor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {consultations.map((consult) => (
-                <TableRow key={consult.id}>
-                  <TableCell className="font-medium">{consult.date}</TableCell>
-                  <TableCell>
-                    <div>{consult.doctor}</div>
-                    <div className="text-sm text-muted-foreground">{consult.specialty}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={consult.status === 'Upcoming' ? 'default' : 'secondary'}>
-                      {consult.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {consult.status === 'Upcoming' ? (
-                      <Button asChild>
-                        <Link href={`/consultation/${consult.id}`}>
-                          <Video className="mr-2 h-4 w-4" />
-                          Join Call
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button variant="outline" asChild>
-                         <Link href={`/dashboard/records`}>
-                           View Record <ArrowRight className="ml-2 h-4 w-4" />
-                         </Link>
-                      </Button>
-                    )}
-                  </TableCell>
+          {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
+          {!isLoading && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date & Time</TableHead>
+                  <TableHead>Doctor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {appointments && appointments.length > 0 ? (
+                  appointments.map((consult) => (
+                    <TableRow key={consult.id}>
+                      <TableCell className="font-medium">
+                        {format(new Date(consult.dateTime), "PPP 'at' p")}
+                      </TableCell>
+                      <TableCell>
+                        <div>Dr. {consult.doctorName}</div>
+                        <div className="text-sm text-muted-foreground">{consult.doctorSpecialty}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(consult.status)} className={consult.status === 'scheduled' ? 'bg-green-500' : ''}>
+                          {consult.status.charAt(0).toUpperCase() + consult.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {consult.status === 'scheduled' ? (
+                          <Button asChild>
+                            <Link href={`/consultation/${consult.id}`}>
+                              <Video className="mr-2 h-4 w-4" />
+                              Join Call
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button variant="outline" asChild>
+                             <Link href={`/dashboard/records`}>
+                               View Record <ArrowRight className="ml-2 h-4 w-4" />
+                             </Link>
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      No consultations scheduled.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

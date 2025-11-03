@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/card';
 import { useUser } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MoreHorizontal, PlusCircle, Users } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Users, Video } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -47,20 +47,16 @@ import {
 import { useState } from 'react';
 import { DoctorForm, type DoctorFormValues } from './doctor-form';
 import { useToast } from '@/hooks/use-toast';
-import {
-  useCollection,
-  useFirestore,
-  useMemoFirebase,
-} from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   setDocumentNonBlocking,
   deleteDocumentNonBlocking,
 } from '@/firebase/non-blocking-updates';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, query, orderBy } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { WithId } from '@/firebase/firestore/use-collection';
-
-// This is now the Doctor Dashboard
+import { format } from 'date-fns';
+import Link from 'next/link';
 
 export type Doctor = {
   firstName: string;
@@ -71,6 +67,14 @@ export type Doctor = {
   address: string;
   isAvailable: boolean;
 };
+
+type Appointment = {
+  id: string;
+  dateTime: string;
+  patientName: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+};
+
 
 export default function StaffPage() {
   const { user, isUserLoading } = useUser();
@@ -89,19 +93,37 @@ export default function StaffPage() {
   );
   const {
     data: doctors,
-    isLoading,
-    error,
+    isLoading: isDoctorsLoading,
+    error: doctorsError,
   } = useCollection<Doctor>(doctorsCollectionRef);
+
+  const appointmentsCollectionRef = useMemoFirebase(
+    () =>
+      user && firestore
+        ? collection(firestore, 'doctors', user.uid, 'appointments')
+        : null,
+    [user, firestore]
+  );
+  const appointmentsQuery = useMemoFirebase(
+    () =>
+      appointmentsCollectionRef
+        ? query(appointmentsCollectionRef, orderBy('dateTime', 'asc'))
+        : null,
+    [appointmentsCollectionRef]
+  );
+  const { data: appointments, isLoading: isAppointmentsLoading } =
+    useCollection<Appointment>(appointmentsQuery);
 
   const handleFormSubmit = (values: DoctorFormValues) => {
     if (!firestore) return;
 
-    const doctorId = selectedDoctor ? selectedDoctor.id : doc(collection(firestore, 'doctors')).id;
+    const doctorId =
+      selectedDoctor?.id || doc(collection(firestore, 'doctors')).id;
     const doctorRef = doc(firestore, 'doctors', doctorId);
 
-    const doctorData: Doctor & {id: string} = {
+    const doctorData: Doctor & { id: string } = {
       ...values,
-      id: doctorId
+      id: doctorId,
     };
 
     setDocumentNonBlocking(doctorRef, doctorData, { merge: true });
@@ -128,6 +150,17 @@ export default function StaffPage() {
   const handleDeleteDoctor = () => {
     if (!firestore || !selectedDoctor) return;
 
+    // Prevent a doctor from deleting their own account from this UI
+    if (user?.uid === selectedDoctor.id) {
+        toast({
+            variant: 'destructive',
+            title: 'Action Not Allowed',
+            description: 'You cannot delete your own account from the doctor roster.',
+        });
+        setDeleteConfirmOpen(false);
+        return;
+    }
+
     const doctorRef = doc(firestore, 'doctors', selectedDoctor.id);
     deleteDocumentNonBlocking(doctorRef);
 
@@ -143,7 +176,7 @@ export default function StaffPage() {
   const openAddDialog = () => {
     setSelectedDoctor(null);
     setDialogOpen(true);
-  }
+  };
 
   return (
     <div className="grid gap-8">
@@ -160,7 +193,62 @@ export default function StaffPage() {
         </p>
       </div>
 
-       <Dialog
+       <Card>
+        <CardHeader>
+          <CardTitle>Upcoming Consultations</CardTitle>
+          <CardDescription>Your scheduled appointments for today and the future.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isAppointmentsLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
+          {!isAppointmentsLoading && (
+             <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Patient</TableHead>
+                  <TableHead>Date & Time</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {appointments && appointments.filter(a => new Date(a.dateTime) >= new Date()).length > 0 ? (
+                  appointments.filter(a => new Date(a.dateTime) >= new Date()).map((appt) => (
+                    <TableRow key={appt.id}>
+                      <TableCell className="font-medium">{appt.patientName}</TableCell>
+                      <TableCell>{format(new Date(appt.dateTime), "PPP 'at' p")}</TableCell>
+                       <TableCell>
+                        <Badge
+                          variant={appt.status === 'scheduled' ? 'default' : 'secondary'}
+                          className={appt.status === 'scheduled' ? 'bg-green-500' : ''}
+                        >
+                          {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                         <Button asChild size="sm">
+                            <Link href={`/consultation/${appt.id}`}>
+                              <Video className="mr-2 h-4 w-4" />
+                              Join Call
+                            </Link>
+                          </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                   <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      No upcoming appointments.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+
+      <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
@@ -183,9 +271,17 @@ export default function StaffPage() {
             </DialogTrigger>
           </CardHeader>
           <CardContent>
-            {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
-            {error && <p className="text-center text-destructive">Error loading doctors. Please try again.</p>}
-            {!isLoading && !error && (
+            {isDoctorsLoading && (
+              <div className="flex justify-center p-8">
+                <LoadingSpinner />
+              </div>
+            )}
+            {doctorsError && (
+              <p className="text-center text-destructive">
+                Error loading doctors. Please try again.
+              </p>
+            )}
+            {!isDoctorsLoading && !doctorsError && (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -197,55 +293,62 @@ export default function StaffPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {doctors && doctors.map((doctor) => (
-                    <TableRow key={doctor.id}>
-                      <TableCell className="font-medium">
-                        Dr. {doctor.firstName} {doctor.lastName}
-                      </TableCell>
-                      <TableCell>{doctor.specialty}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            doctor.isAvailable ? 'default' : 'secondary'
-                          }
-                          className={doctor.isAvailable ? 'bg-green-500' : ''}
-                        >
-                          {doctor.isAvailable ? 'Available' : 'Unavailable'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div>{doctor.email}</div>
-                        <div className="text-sm text-muted-foreground">{doctor.phone}</div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => openEditDialog(doctor)}
-                            >
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => openDeleteDialog(doctor)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {doctors &&
+                    doctors.map((doctor) => (
+                      <TableRow key={doctor.id}>
+                        <TableCell className="font-medium">
+                          Dr. {doctor.firstName} {doctor.lastName}
+                        </TableCell>
+                        <TableCell>{doctor.specialty}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              doctor.isAvailable ? 'default' : 'secondary'
+                            }
+                            className={doctor.isAvailable ? 'bg-green-500' : ''}
+                          >
+                            {doctor.isAvailable ? 'Available' : 'Unavailable'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>{doctor.email}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {doctor.phone}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Actions</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => openEditDialog(doctor)}
+                              >
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => openDeleteDialog(doctor)}
+                                disabled={user?.uid === doctor.id}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   {(!doctors || doctors.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                      <TableCell
+                        colSpan={5}
+                        className="py-8 text-center text-muted-foreground"
+                      >
                         No doctors found. Add one to get started.
                       </TableCell>
                     </TableRow>
@@ -267,7 +370,10 @@ export default function StaffPage() {
           />
         </DialogContent>
       </Dialog>
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <AlertDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -287,7 +393,6 @@ export default function StaffPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }
