@@ -42,13 +42,13 @@ export default function ConsultationPage({
     if (localStream && localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream]);
+  }, [localStream, callJoined]);
 
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream]);
+  }, [remoteStream, callJoined]);
 
 
   const handleJoinCall = async (stream: MediaStream) => {
