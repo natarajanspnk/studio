@@ -23,11 +23,10 @@ import { useFirestore } from '@/firebase';
 import { createPeerConnection, startCall, joinCall } from '@/lib/webrtc';
 
 export default function ConsultationPage({
-  params,
+  params: { id },
 }: {
   params: { id: string };
 }) {
-  const { id } = params;
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [callJoined, setCallJoined] = useState(false);
