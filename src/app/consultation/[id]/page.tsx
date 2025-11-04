@@ -53,7 +53,7 @@ export default function ConsultationPage({
   }, [remoteStream, callJoined]);
 
 
-  const handleJoinCall = async (stream: MediaStream) => {
+  const handleJoinCall = async (stream: MediaStream, callId: string) => {
     setLocalStream(stream);
     setCallJoined(true);
 
@@ -62,18 +62,18 @@ export default function ConsultationPage({
       return;
     }
 
-    createPeerConnection(firestore, params.id, setRemoteStream);
+    createPeerConnection(firestore, callId, setRemoteStream);
 
     // Determine role (caller vs joiner) by checking for an existing offer
-    const callDocRef = doc(firestore, 'calls', params.id);
+    const callDocRef = doc(firestore, 'calls', callId);
     const callDoc = await getDoc(callDocRef);
 
     if (callDoc.exists() && callDoc.data().offer) {
         // Offer exists, so we are the joiner
-        await joinCall(firestore, params.id, stream);
+        await joinCall(firestore, callId, stream);
     } else {
         // No offer, so we are the caller
-        await startCall(firestore, params.id, stream);
+        await startCall(firestore, callId, stream);
     }
   };
 
@@ -98,7 +98,7 @@ export default function ConsultationPage({
   if (!callJoined) {
     return (
       <ConsultationPreview
-        onJoinCall={handleJoinCall}
+        onJoinCall={(stream) => handleJoinCall(stream, params.id)}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
         setIsMicOn={setIsMicOn}
