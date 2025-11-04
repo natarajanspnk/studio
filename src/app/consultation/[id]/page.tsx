@@ -71,18 +71,47 @@ export default function ConsultationPage({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [userRole, setUserRole] = useState<'patient' | 'doctor' | null>(null);
+  const [appointment, setAppointment] = useState<any>(null);
 
 
-  // Determine user role
+  // Determine user role and get appointment
   const patientDocRef = useMemoFirebase(() => user ? doc(firestore, 'patients', user.uid) : null, [user, firestore]);
   const doctorDocRef = useMemoFirebase(() => user ? doc(firestore, 'doctors', user.uid) : null, [user, firestore]);
   const { data: patientData, isLoading: isPatientLoading } = useDoc(patientDocRef);
   const { data: doctorData, isLoading: isDoctorLoading } = useDoc(doctorDocRef);
 
   useEffect(() => {
-    if (patientData) setUserRole('patient');
-    else if (doctorData) setUserRole('doctor');
-  }, [patientData, doctorData]);
+    const determineRoleAndGetAppointment = async () => {
+        if (!user || !firestore) return;
+        
+        let foundRole: 'patient' | 'doctor' | null = null;
+        let appointmentDoc;
+        
+        // Check if user is a doctor
+        const doctorDoc = await getDoc(doctorDocRef!);
+        if (doctorDoc.exists()) {
+            foundRole = 'doctor';
+            const appointmentRef = doc(firestore, 'doctors', user.uid, 'appointments', callId);
+            appointmentDoc = await getDoc(appointmentRef);
+        } else {
+             // Check if user is a patient
+            const patientDoc = await getDoc(patientDocRef!);
+            if (patientDoc.exists()) {
+                foundRole = 'patient';
+                const appointmentRef = doc(firestore, 'patients', user.uid, 'appointments', callId);
+                appointmentDoc = await getDoc(appointmentRef);
+            }
+        }
+        
+        setUserRole(foundRole);
+        if (appointmentDoc?.exists()) {
+            setAppointment(appointmentDoc.data());
+        }
+    }
+    
+    determineRoleAndGetAppointment();
+
+  }, [user, firestore, callId, doctorDocRef, patientDocRef]);
 
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -179,7 +208,9 @@ export default function ConsultationPage({
   const endCall = () => {
     localStream?.getTracks().forEach((track) => track.stop());
     remoteStream?.getTracks().forEach((track) => track.stop());
-    hangUp();
+    // We don't call hangUp() here to allow rejoining.
+    // hangUp(); 
+    
     // Role-based redirect
     if (userRole === 'doctor') {
       window.location.href = '/dashboard/staff';
@@ -197,7 +228,7 @@ export default function ConsultationPage({
     return name.substring(0, 2);
   };
   
-  const isLoading = isUserLoading || isPatientLoading || isDoctorLoading;
+  const isLoading = isUserLoading || isPatientLoading || isDoctorLoading || !userRole;
 
   if (isLoading) {
     return <div className="flex h-screen w-full items-center justify-center"><LoadingSpinner /></div>
@@ -229,13 +260,16 @@ export default function ConsultationPage({
               />
               {!remoteStream?.active && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-                  <p className="mt-2 text-white/70">
-                    Waiting for the other person to join...
-                  </p>
+                   <div className="flex flex-col items-center gap-2 text-center">
+                    <LoadingSpinner className='text-white' />
+                    <p className="mt-2 text-white/70">
+                        Waiting for the other person to join...
+                    </p>
+                   </div>
                 </div>
               )}
               <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
-                Remote
+                {userRole === 'patient' ? appointment?.doctorName : appointment?.patientName}
               </div>
             </div>
 
@@ -375,18 +409,6 @@ export default function ConsultationPage({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Chat</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 rounded-full text-white hover:bg-white/10 hover:text-white"
-                >
-                  <Users className="h-6 w-6" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Participants</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
