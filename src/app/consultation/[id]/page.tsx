@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/tooltip';
 import { ConsultationPreview } from './preview';
 import { useFirestore } from '@/firebase';
-import { createPeerConnection, startCall, joinCall } from '@/lib/webrtc';
+import { createPeerConnection, startCall, joinCall, hangUp } from '@/lib/webrtc';
 import { doc, getDoc } from 'firebase/firestore';
 
 export default function ConsultationPage({
@@ -34,7 +34,7 @@ export default function ConsultationPage({
   const [callJoined, setCallJoined] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  
+
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -52,17 +52,14 @@ export default function ConsultationPage({
     }
   }, [remoteStream, callJoined]);
 
-
-  const handleJoinCall = async (stream: MediaStream) => {
+  const handleJoinCall = async (stream: MediaStream, callId: string) => {
     setLocalStream(stream);
     setCallJoined(true);
 
     if (!firestore) {
-      console.error("Firestore is not available");
+      console.error('Firestore is not available');
       return;
     }
-    
-    const callId = params.id;
 
     createPeerConnection(firestore, callId, (newRemoteStream) => {
       setRemoteStream(newRemoteStream);
@@ -73,11 +70,11 @@ export default function ConsultationPage({
     const callDoc = await getDoc(callDocRef);
 
     if (callDoc.exists() && callDoc.data().offer) {
-        // Offer exists, so we are the joiner
-        await joinCall(firestore, callId, stream);
+      // Offer exists, so we are the joiner
+      await joinCall(firestore, callId, stream);
     } else {
-        // No offer, so we are the caller
-        await startCall(firestore, callId, stream);
+      // No offer, so we are the caller
+      await startCall(firestore, callId, stream);
     }
   };
 
@@ -98,25 +95,22 @@ export default function ConsultationPage({
       setIsCameraOn(!isCameraOn);
     }
   };
-  
+
   const endCall = () => {
     // Stop all media tracks
-    localStream?.getTracks().forEach(track => track.stop());
-    remoteStream?.getTracks().forEach(track => track.stop());
+    localStream?.getTracks().forEach((track) => track.stop());
+    remoteStream?.getTracks().forEach((track) => track.stop());
 
-    // Close the peer connection
-    // The global peerConnection in webrtc.ts will be closed in its own functions,
-    // but good practice to handle cleanup here too if it were managed in-component.
+    hangUp();
 
     // Navigate away
     window.location.href = '/dashboard';
   };
 
-
   if (!callJoined) {
     return (
       <ConsultationPreview
-        onJoinCall={handleJoinCall}
+        onJoinCall={(stream) => handleJoinCall(stream, params.id)}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
         setIsMicOn={setIsMicOn}
@@ -131,15 +125,17 @@ export default function ConsultationPage({
       <div className="grid flex-1 grid-cols-1 gap-2 p-2 md:grid-cols-2">
         {/* Remote video (Doctor/Other person) */}
         <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
-           <video
+          <video
             ref={remoteVideoRef}
             className="h-full w-full object-cover"
             autoPlay
             playsInline
           />
           {!remoteStream?.active && (
-             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-              <p className="mt-2 text-white/70">Waiting for the other person to join...</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+              <p className="mt-2 text-white/70">
+                Waiting for the other person to join...
+              </p>
             </div>
           )}
           <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
@@ -240,7 +236,7 @@ export default function ConsultationPage({
                   size="icon"
                   className="h-12 w-12 rounded-full"
                 >
-                   <PhoneOff className="h-6 w-6" />
+                  <PhoneOff className="h-6 w-6" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>End Call</TooltipContent>
