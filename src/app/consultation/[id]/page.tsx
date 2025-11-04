@@ -62,19 +62,18 @@ export default function ConsultationPage({
       return;
     }
 
-    const callId = params.id;
-    createPeerConnection(firestore, callId, setRemoteStream);
+    createPeerConnection(firestore, params.id, setRemoteStream);
 
     // Determine role (caller vs joiner) by checking for an existing offer
-    const callDocRef = doc(firestore, 'calls', callId);
+    const callDocRef = doc(firestore, 'calls', params.id);
     const callDoc = await getDoc(callDocRef);
 
     if (callDoc.exists() && callDoc.data().offer) {
         // Offer exists, so we are the joiner
-        await joinCall(firestore, callId, stream);
+        await joinCall(firestore, params.id, stream);
     } else {
         // No offer, so we are the caller
-        await startCall(firestore, callId, stream);
+        await startCall(firestore, params.id, stream);
     }
   };
 
