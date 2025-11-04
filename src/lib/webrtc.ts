@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Firestore,
@@ -28,9 +29,13 @@ export const createPeerConnection = (
 ) => {
   peerConnection = new RTCPeerConnection(servers);
 
+  const remoteStream = new MediaStream();
+  onRemoteStream(remoteStream);
+
+
   peerConnection.ontrack = (event) => {
     event.streams[0].getTracks().forEach((track) => {
-      onRemoteStream(event.streams[0]);
+      remoteStream.addTrack(track);
     });
   };
 
@@ -58,13 +63,6 @@ export const startCall = async (
   }
 
   const callDocRef = doc(firestore, 'calls', callId);
-  const callDoc = await getDoc(callDocRef);
-
-  if (callDoc.exists() && callDoc.data().offer) {
-    // This indicates another user has already started the call.
-    // The component logic should catch this and call joinCall instead.
-    throw new Error('Call already initiated. Joining instead.');
-  }
 
   localStream.getTracks().forEach((track) => {
     peerConnection!.addTrack(track, localStream);
@@ -122,24 +120,21 @@ export const joinCall = async (
     throw new Error("Call doesn't exist!");
   }
 
+  // Override onicecandidate for the joiner to write to the correct subcollection
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      const candidatesCollection = collection(
+        firestore,
+        'calls',
+        callId,
+        'answerCandidates'
+      );
+      addDoc(candidatesCollection, event.candidate.toJSON());
+    }
+  };
+
   localStream.getTracks().forEach((track) => {
     peerConnection!.addTrack(track, localStream);
-  });
-
-  // Listen for remote ICE candidates from the caller
-  const offerCandidatesCollection = collection(
-    firestore,
-    'calls',
-    callId,
-    'offerCandidates'
-  );
-  onSnapshot(offerCandidatesCollection, (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === 'added') {
-        let data = change.doc.data();
-        peerConnection!.addIceCandidate(new RTCIceCandidate(data));
-      }
-    });
   });
 
   const offerDescription = callDoc.data().offer;
@@ -157,16 +152,19 @@ export const joinCall = async (
 
   await updateDoc(callDocRef, { answer });
 
-  // Override onicecandidate for the joiner
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      const candidatesCollection = collection(
-        firestore,
-        'calls',
-        callId,
-        'answerCandidates'
-      );
-      addDoc(candidatesCollection, event.candidate.toJSON());
-    }
-  };
+  // Listen for remote ICE candidates from the caller
+  const offerCandidatesCollection = collection(
+    firestore,
+    'calls',
+    callId,
+    'offerCandidates'
+  );
+  onSnapshot(offerCandidatesCollection, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'added') {
+        let data = change.doc.data();
+        peerConnection!.addIceCandidate(new RTCIceCandidate(data));
+      }
+    });
+  });
 };

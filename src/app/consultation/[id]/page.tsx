@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -21,6 +22,7 @@ import {
 import { ConsultationPreview } from './preview';
 import { useFirestore } from '@/firebase';
 import { createPeerConnection, startCall, joinCall } from '@/lib/webrtc';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function ConsultationPage({
   params,
@@ -63,15 +65,16 @@ export default function ConsultationPage({
 
     createPeerConnection(firestore, id, setRemoteStream);
 
-    // This is a simplified logic. In a real app, you'd have a more robust
-    // way to determine who is the caller and who is the joiner.
-    // For this prototype, we'll assume the first person to arrive starts the call.
-    // We can use a document existence check for this.
-    try {
-        await startCall(firestore, id, stream);
-    } catch (e) {
-        // If startCall fails (e.g., offer already exists), it means we are the joiner
+    // Determine role (caller vs joiner) by checking for an existing offer
+    const callDocRef = doc(firestore, 'calls', id);
+    const callDoc = await getDoc(callDocRef);
+
+    if (callDoc.exists() && callDoc.data().offer) {
+        // Offer exists, so we are the joiner
         await joinCall(firestore, id, stream);
+    } else {
+        // No offer, so we are the caller
+        await startCall(firestore, id, stream);
     }
   };
 
