@@ -47,8 +47,7 @@ const patientNavItems = [
 
 const doctorNavItems = [
     { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
-    { href: '/dashboard/consultations', label: 'Consultations', icon: Video },
+    { href: '/dashboard/staff/roster', label: 'Manage Roster', icon: Users },
     { href: '/dashboard/records', label: 'Patient Records', icon: FileText },
 ];
 
