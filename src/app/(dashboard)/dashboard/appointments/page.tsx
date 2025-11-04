@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -24,11 +25,24 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import {
+  useCollection,
+  useFirestore,
+  useMemoFirebase,
+  useUser,
+} from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { WithId } from '@/firebase/firestore/use-collection';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Doctor = {
   id: string;
@@ -36,6 +50,7 @@ type Doctor = {
   lastName: string;
   specialty: string;
   isAvailable: boolean;
+  address: string;
 };
 
 const timeSlots = [
@@ -62,6 +77,26 @@ export default function AppointmentsPage() {
     [firestore]
   );
   const { data: doctors, isLoading } = useCollection<Doctor>(doctorsCollection);
+
+  const [specialtyFilter, setSpecialtyFilter] = useState('All');
+  const [locationFilter, setLocationFilter] = useState('');
+
+  const specialties = useMemo(() => {
+    if (!doctors) return [];
+    const allSpecialties = doctors.map((doc) => doc.specialty);
+    return ['All', ...Array.from(new Set(allSpecialties))];
+  }, [doctors]);
+
+  const filteredDoctors = useMemo(() => {
+    return doctors?.filter((doctor) => {
+      const specialtyMatch =
+        specialtyFilter === 'All' || doctor.specialty === specialtyFilter;
+      const locationMatch =
+        locationFilter === '' ||
+        doctor.address?.toLowerCase().includes(locationFilter.toLowerCase());
+      return specialtyMatch && locationMatch;
+    });
+  }, [doctors, specialtyFilter, locationFilter]);
 
   const handleBookAppointment = () => {
     if (!selectedSlot || !date || !user || !firestore) {
@@ -118,8 +153,12 @@ export default function AppointmentsPage() {
       );
 
       // Non-blocking writes
-      setDocumentNonBlocking(patientAppointmentRef, appointmentData, { merge: true });
-      setDocumentNonBlocking(doctorAppointmentRef, appointmentData, { merge: true });
+      setDocumentNonBlocking(patientAppointmentRef, appointmentData, {
+        merge: true,
+      });
+      setDocumentNonBlocking(doctorAppointmentRef, appointmentData, {
+        merge: true,
+      });
 
       toast({
         title: 'Appointment Booked!',
@@ -152,6 +191,46 @@ export default function AppointmentsPage() {
           specialists.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Filter Doctors</CardTitle>
+          <CardDescription>
+            Find the right specialist for your needs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label htmlFor="specialty-filter" className="text-sm font-medium">
+              Specialty
+            </label>
+            <Select onValueChange={setSpecialtyFilter} defaultValue="All">
+              <SelectTrigger id="specialty-filter">
+                <SelectValue placeholder="Select a specialty" />
+              </SelectTrigger>
+              <SelectContent>
+                {specialties.map((specialty) => (
+                  <SelectItem key={specialty} value={specialty}>
+                    {specialty}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="location-filter" className="text-sm font-medium">
+              Location
+            </label>
+            <Input
+              id="location-filter"
+              placeholder="e.g., City or State"
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <AlertDialog>
         <div className="grid gap-8 lg:grid-cols-3">
           <Card className="lg:col-span-1">
@@ -175,7 +254,14 @@ export default function AppointmentsPage() {
                 <LoadingSpinner />
               </div>
             )}
-            {doctors?.map((doctor) => {
+            {!isLoading && filteredDoctors?.length === 0 && (
+                <Card>
+                    <CardContent className="p-8 text-center text-muted-foreground">
+                        No doctors found matching your criteria.
+                    </CardContent>
+                </Card>
+            )}
+            {filteredDoctors?.map((doctor) => {
               const avatar =
                 placeholderImages.find(
                   (img) => img.id === `doctor-${doctor.id.slice(0, 1)}`
@@ -205,6 +291,7 @@ export default function AppointmentsPage() {
                         Dr. {doctor.firstName} {doctor.lastName}
                       </CardTitle>
                       <CardDescription>{doctor.specialty}</CardDescription>
+                      <CardDescription className='mt-1'>{doctor.address}</CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -273,3 +360,4 @@ export default function AppointmentsPage() {
     </div>
   );
 }
+
