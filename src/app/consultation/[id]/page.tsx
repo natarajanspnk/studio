@@ -29,7 +29,6 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
-  const { id } = params;
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [callJoined, setCallJoined] = useState(false);
@@ -63,18 +62,18 @@ export default function ConsultationPage({
       return;
     }
 
-    createPeerConnection(firestore, id, setRemoteStream);
+    createPeerConnection(firestore, params.id, setRemoteStream);
 
     // Determine role (caller vs joiner) by checking for an existing offer
-    const callDocRef = doc(firestore, 'calls', id);
+    const callDocRef = doc(firestore, 'calls', params.id);
     const callDoc = await getDoc(callDocRef);
 
     if (callDoc.exists() && callDoc.data().offer) {
         // Offer exists, so we are the joiner
-        await joinCall(firestore, id, stream);
+        await joinCall(firestore, params.id, stream);
     } else {
         // No offer, so we are the caller
-        await startCall(firestore, id, stream);
+        await startCall(firestore, params.id, stream);
     }
   };
 
