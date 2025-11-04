@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -54,6 +55,8 @@ export default function StaffPage() {
   );
   const { data: appointments, isLoading: isAppointmentsLoading } =
     useCollection<Appointment>(appointmentsQuery);
+    
+  const upcomingAppointments = appointments?.filter(a => a.status === 'scheduled') || [];
 
   return (
     <div className="grid gap-8">
@@ -88,8 +91,8 @@ export default function StaffPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {appointments && appointments.filter(a => new Date(a.dateTime) >= new Date()).length > 0 ? (
-                  appointments.filter(a => new Date(a.dateTime) >= new Date()).map((appt) => (
+                {upcomingAppointments.length > 0 ? (
+                  upcomingAppointments.map((appt) => (
                     <TableRow key={appt.id}>
                       <TableCell className="font-medium">{appt.patientName}</TableCell>
                       <TableCell>{format(new Date(appt.dateTime), "PPP 'at' p")}</TableCell>
