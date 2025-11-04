@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import {
@@ -13,13 +14,17 @@ import { Button } from '@/components/ui/button';
 import { Video, ArrowRight, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { format } from 'date-fns';
+import { useEffect } from 'react';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { WithId } from '@/firebase/firestore/use-collection';
 
 type Appointment = {
   id: string;
   dateTime: string;
+  doctorId: string;
   doctorName: string;
   doctorSpecialty: string;
   status: 'scheduled' | 'completed' | 'cancelled';
@@ -41,6 +46,26 @@ export default function ConsultationsPage() {
 
   const { data: appointments, isLoading } = useCollection<Appointment>(appointmentsQuery);
 
+   useEffect(() => {
+    if (!appointments || !user || !firestore) return;
+
+    const now = new Date();
+
+    appointments.forEach((appt) => {
+      if (appt.status === 'scheduled' && new Date(appt.dateTime) < now) {
+        // This appointment has expired, so update its status to 'completed'.
+        const updatedAppointment = { ...appt, status: 'completed' };
+
+        const patientAppointmentRef = doc(firestore, 'patients', user.uid, 'appointments', appt.id);
+        const doctorAppointmentRef = doc(firestore, 'doctors', appt.doctorId, 'appointments', appt.id);
+
+        setDocumentNonBlocking(patientAppointmentRef, updatedAppointment, { merge: true });
+        setDocumentNonBlocking(doctorAppointmentRef, updatedAppointment, { merge: true });
+      }
+    });
+  }, [appointments, user, firestore]);
+
+
   const getStatusVariant = (status: Appointment['status']) => {
     switch (status) {
       case 'scheduled':
@@ -53,6 +78,10 @@ export default function ConsultationsPage() {
         return 'outline';
     }
   };
+
+  const upcomingAppointments = appointments?.filter(appt => appt.status === 'scheduled') || [];
+  const pastAppointments = appointments?.filter(appt => appt.status !== 'scheduled') || [];
+
 
   return (
     <div className="space-y-8">
@@ -67,9 +96,9 @@ export default function ConsultationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Consultation Schedule</CardTitle>
+          <CardTitle>Upcoming Consultations</CardTitle>
           <CardDescription>
-            A list of your scheduled and completed video calls.
+            A list of your scheduled video calls.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -85,8 +114,8 @@ export default function ConsultationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {appointments && appointments.length > 0 ? (
-                  appointments.map((consult) => (
+                {upcomingAppointments.length > 0 ? (
+                  upcomingAppointments.map((consult) => (
                     <TableRow key={consult.id}>
                       <TableCell className="font-medium">
                         {format(new Date(consult.dateTime), "PPP 'at' p")}
@@ -96,32 +125,81 @@ export default function ConsultationsPage() {
                         <div className="text-sm text-muted-foreground">{consult.doctorSpecialty}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getStatusVariant(consult.status)} className={consult.status === 'scheduled' ? 'bg-green-500' : ''}>
+                        <Badge variant={getStatusVariant(consult.status)} className="bg-green-500">
                           {consult.status.charAt(0).toUpperCase() + consult.status.slice(1)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {consult.status === 'scheduled' ? (
-                          <Button asChild>
-                            <Link href={`/consultation/${consult.id}`}>
-                              <Video className="mr-2 h-4 w-4" />
-                              Join Call
-                            </Link>
-                          </Button>
-                        ) : (
-                          <Button variant="outline" asChild>
-                             <Link href={`/dashboard/records`}>
-                               View Record <ArrowRight className="ml-2 h-4 w-4" />
-                             </Link>
-                          </Button>
-                        )}
+                        <Button asChild>
+                          <Link href={`/consultation/${consult.id}`}>
+                            <Video className="mr-2 h-4 w-4" />
+                            Join Call
+                          </Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
-                      No consultations scheduled.
+                      No upcoming consultations scheduled.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Past Consultations</CardTitle>
+          <CardDescription>
+            A history of your completed and cancelled appointments.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading && <div className="flex justify-center p-8"><LoadingSpinner /></div>}
+          {!isLoading && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date & Time</TableHead>
+                  <TableHead>Doctor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pastAppointments.length > 0 ? (
+                  pastAppointments.map((consult) => (
+                    <TableRow key={consult.id}>
+                      <TableCell className="font-medium">
+                        {format(new Date(consult.dateTime), "PPP 'at' p")}
+                      </TableCell>
+                      <TableCell>
+                        <div>Dr. {consult.doctorName}</div>
+                        <div className="text-sm text-muted-foreground">{consult.doctorSpecialty}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(consult.status)}>
+                          {consult.status.charAt(0).toUpperCase() + consult.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                         <Button variant="outline" asChild>
+                           <Link href={`/dashboard/records`}>
+                              View Record <ArrowRight className="ml-2 h-4 w-4" />
+                           </Link>
+                         </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      No past consultations.
                     </TableCell>
                   </TableRow>
                 )}
