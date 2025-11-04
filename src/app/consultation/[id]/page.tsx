@@ -12,7 +12,6 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
 import {
   Tooltip,
   TooltipContent,
@@ -21,7 +20,12 @@ import {
 } from '@/components/ui/tooltip';
 import { ConsultationPreview } from './preview';
 import { useFirestore } from '@/firebase';
-import { createPeerConnection, startCall, joinCall, hangUp } from '@/lib/webrtc';
+import {
+  createPeerConnection,
+  startCall,
+  joinCall,
+  hangUp,
+} from '@/lib/webrtc';
 import { doc, getDoc } from 'firebase/firestore';
 
 export default function ConsultationPage({
@@ -29,6 +33,7 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
+  const { id: callId } = params;
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [callJoined, setCallJoined] = useState(false);
@@ -52,7 +57,7 @@ export default function ConsultationPage({
     }
   }, [remoteStream, callJoined]);
 
-  const handleJoinCall = async (stream: MediaStream, callId: string) => {
+  const handleJoinCall = async (stream: MediaStream) => {
     setLocalStream(stream);
     setCallJoined(true);
 
@@ -110,7 +115,7 @@ export default function ConsultationPage({
   if (!callJoined) {
     return (
       <ConsultationPreview
-        onJoinCall={(stream) => handleJoinCall(stream, params.id)}
+        onJoinCall={handleJoinCall}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
         setIsMicOn={setIsMicOn}
