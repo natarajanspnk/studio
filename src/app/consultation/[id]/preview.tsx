@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -37,6 +38,7 @@ export function ConsultationPreview({
 
   useEffect(() => {
     const getMedia = async () => {
+      setIsLoading(true);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -47,9 +49,12 @@ export function ConsultationPreview({
           videoRef.current.srcObject = stream;
         }
         setHasPermission(true);
-        // Apply initial mic/camera state that was passed from the parent
-        stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
-        stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
+        
+        // Ensure initial state from parent is respected, but only if stream is active
+        if (stream) {
+          stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
+          stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
+        }
 
       } catch (error) {
         console.error('Error accessing media devices.', error);
@@ -68,10 +73,10 @@ export function ConsultationPreview({
     getMedia();
 
     return () => {
-      // Stop tracks when component unmounts *if* the call was not joined.
-      // If the call was joined, the parent component will handle stopping the stream.
-      if (streamRef.current && !videoRef.current?.srcObject) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+      // This cleanup runs when the component unmounts.
+      // If the user navigates away from the preview without joining, stop the media tracks.
+      if (streamRef.current) {
+         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   // We only want to run this once on mount, so we pass an empty dependency array.
@@ -103,6 +108,9 @@ export function ConsultationPreview({
     if (streamRef.current) {
       // Pass the active stream to the parent component to use in the call
       onJoinCall(streamRef.current);
+      // Nullify the stream ref here so the cleanup function doesn't stop the tracks,
+      // as they are now being managed by the parent component.
+      streamRef.current = null;
     }
   };
 
@@ -122,6 +130,7 @@ export function ConsultationPreview({
               className={`h-full w-full object-cover ${!isLoading && hasPermission ? 'block' : 'hidden'} -scale-x-100`}
               autoPlay
               muted
+              playsInline
             />
              {!isLoading && !hasPermission && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 p-4 text-center">

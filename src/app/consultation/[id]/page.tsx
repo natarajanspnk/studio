@@ -41,19 +41,19 @@ export default function ConsultationPage({
   const firestore = useFirestore();
 
   useEffect(() => {
-    if (localStream && localVideoRef.current) {
+    if (callJoined && localStream && localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream, callJoined]);
 
   useEffect(() => {
-    if (remoteStream && remoteVideoRef.current) {
+    if (callJoined && remoteStream && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream, callJoined]);
 
 
-  const handleJoinCall = async (stream: MediaStream, callId: string) => {
+  const handleJoinCall = async (stream: MediaStream) => {
     setLocalStream(stream);
     setCallJoined(true);
 
@@ -61,8 +61,12 @@ export default function ConsultationPage({
       console.error("Firestore is not available");
       return;
     }
+    
+    const callId = params.id;
 
-    createPeerConnection(firestore, callId, setRemoteStream);
+    createPeerConnection(firestore, callId, (newRemoteStream) => {
+      setRemoteStream(newRemoteStream);
+    });
 
     // Determine role (caller vs joiner) by checking for an existing offer
     const callDocRef = doc(firestore, 'calls', callId);
@@ -94,11 +98,25 @@ export default function ConsultationPage({
       setIsCameraOn(!isCameraOn);
     }
   };
+  
+  const endCall = () => {
+    // Stop all media tracks
+    localStream?.getTracks().forEach(track => track.stop());
+    remoteStream?.getTracks().forEach(track => track.stop());
+
+    // Close the peer connection
+    // The global peerConnection in webrtc.ts will be closed in its own functions,
+    // but good practice to handle cleanup here too if it were managed in-component.
+
+    // Navigate away
+    window.location.href = '/dashboard';
+  };
+
 
   if (!callJoined) {
     return (
       <ConsultationPreview
-        onJoinCall={(stream) => handleJoinCall(stream, params.id)}
+        onJoinCall={handleJoinCall}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
         setIsMicOn={setIsMicOn}
@@ -119,7 +137,7 @@ export default function ConsultationPage({
             autoPlay
             playsInline
           />
-          {!remoteStream && (
+          {!remoteStream?.active && (
              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
               <p className="mt-2 text-white/70">Waiting for the other person to join...</p>
             </div>
@@ -217,14 +235,12 @@ export default function ConsultationPage({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  asChild
+                  onClick={endCall}
                   variant="destructive"
                   size="icon"
                   className="h-12 w-12 rounded-full"
                 >
-                  <Link href="/dashboard">
-                    <PhoneOff className="h-6 w-6" />
-                  </Link>
+                   <PhoneOff className="h-6 w-6" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>End Call</TooltipContent>

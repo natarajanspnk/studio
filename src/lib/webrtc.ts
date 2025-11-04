@@ -9,6 +9,7 @@ import {
   onSnapshot,
   setDoc,
   updateDoc,
+  Unsubscribe,
 } from 'firebase/firestore';
 
 const servers = {
@@ -21,6 +22,9 @@ const servers = {
 };
 
 let peerConnection: RTCPeerConnection | null = null;
+let unsubscribeCall: Unsubscribe | null = null;
+let unsubscribeCandidates: Unsubscribe | null = null;
+
 
 export const createPeerConnection = (
   firestore: Firestore,
@@ -38,19 +42,6 @@ export const createPeerConnection = (
       remoteStream.addTrack(track);
     });
   };
-
-  // Listen for local ICE candidates and add them to Firestore
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      const candidatesCollection = collection(
-        firestore,
-        'calls',
-        callId,
-        'offerCandidates'
-      );
-      addDoc(candidatesCollection, event.candidate.toJSON());
-    }
-  };
 };
 
 export const startCall = async (
@@ -67,6 +58,13 @@ export const startCall = async (
   localStream.getTracks().forEach((track) => {
     peerConnection!.addTrack(track, localStream);
   });
+  
+  peerConnection.onicecandidate = async (event) => {
+    if (event.candidate) {
+      const candidatesCollection = collection(firestore, 'calls', callId, 'offerCandidates');
+      await addDoc(candidatesCollection, event.candidate.toJSON());
+    }
+  };
 
   const offerDescription = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offerDescription);
@@ -79,26 +77,21 @@ export const startCall = async (
   await setDoc(callDocRef, { offer });
 
   // Listen for the answer
-  onSnapshot(callDocRef, (snapshot) => {
+  unsubscribeCall = onSnapshot(callDocRef, (snapshot) => {
     const data = snapshot.data();
-    if (!peerConnection!.currentRemoteDescription && data?.answer) {
+    if (!peerConnection?.currentRemoteDescription && data?.answer) {
       const answerDescription = new RTCSessionDescription(data.answer);
-      peerConnection!.setRemoteDescription(answerDescription);
+      peerConnection?.setRemoteDescription(answerDescription);
     }
   });
 
   // Listen for remote ICE candidates
-  const answerCandidatesCollection = collection(
-    firestore,
-    'calls',
-    callId,
-    'answerCandidates'
-  );
-  onSnapshot(answerCandidatesCollection, (snapshot) => {
+  const answerCandidatesCollection = collection(firestore, 'calls', callId, 'answerCandidates');
+  unsubscribeCandidates = onSnapshot(answerCandidatesCollection, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
         const candidate = new RTCIceCandidate(change.doc.data());
-        peerConnection!.addIceCandidate(candidate);
+        peerConnection?.addIceCandidate(candidate);
       }
     });
   });
@@ -120,22 +113,16 @@ export const joinCall = async (
     throw new Error("Call doesn't exist!");
   }
 
-  // Override onicecandidate for the joiner to write to the correct subcollection
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      const candidatesCollection = collection(
-        firestore,
-        'calls',
-        callId,
-        'answerCandidates'
-      );
-      addDoc(candidatesCollection, event.candidate.toJSON());
-    }
-  };
-
   localStream.getTracks().forEach((track) => {
     peerConnection!.addTrack(track, localStream);
   });
+  
+  peerConnection.onicecandidate = async (event) => {
+    if (event.candidate) {
+      const candidatesCollection = collection(firestore, 'calls', callId, 'answerCandidates');
+      await addDoc(candidatesCollection, event.candidate.toJSON());
+    }
+  };
 
   const offerDescription = callDoc.data().offer;
   await peerConnection.setRemoteDescription(
@@ -159,7 +146,7 @@ export const joinCall = async (
     callId,
     'offerCandidates'
   );
-  onSnapshot(offerCandidatesCollection, (snapshot) => {
+  unsubscribeCandidates = onSnapshot(offerCandidatesCollection, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
         let data = change.doc.data();
@@ -168,3 +155,18 @@ export const joinCall = async (
     });
   });
 };
+
+export const hangUp = () => {
+    if (unsubscribeCall) {
+        unsubscribeCall();
+        unsubscribeCall = null;
+    }
+    if (unsubscribeCandidates) {
+        unsubscribeCandidates();
+        unsubscribeCandidates = null;
+    }
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+}
