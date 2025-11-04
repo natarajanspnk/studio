@@ -88,20 +88,15 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (user && userData) {
-      form.reset({
-        fullName: user.displayName || '',
-        email: user.email || '',
-        phone: (userData as any)?.phone || '',
-        dateOfBirth: (userData as any)?.dateOfBirth || '',
-        specialty: (userData as any)?.specialty || '',
-      });
-    } else if (user) {
-        form.reset({
-            fullName: user.displayName || '',
-            email: user.email || '',
-        })
-    }
+    // Reset form with default values (empty strings) to ensure inputs are controlled
+    // even while user data is loading or is not present.
+    form.reset({
+      fullName: user?.displayName || '',
+      email: user?.email || '',
+      phone: (userData as any)?.phone || '',
+      dateOfBirth: (userData as any)?.dateOfBirth || '',
+      specialty: (userData as any)?.specialty || '',
+    });
   }, [user, userData, form]);
 
   async function onSubmit(data: ProfileFormValues) {
