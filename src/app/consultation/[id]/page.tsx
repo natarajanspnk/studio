@@ -10,6 +10,8 @@ import {
   PhoneOff,
   Users,
   MessageSquare,
+  Send,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,31 +21,92 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ConsultationPreview } from './preview';
-import { useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import {
   createPeerConnection,
   startCall,
   joinCall,
   hangUp,
 } from '@/lib/webrtc';
-import { doc, getDoc } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDoc,
+  query,
+  orderBy,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { WithId } from '@/firebase/firestore/use-collection';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+type Message = {
+  text: string;
+  senderId: string;
+  senderName: string;
+  timestamp: {
+    seconds: number;
+    nanoseconds: number;
+  };
+};
 
 export default function ConsultationPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const { id: callId } = params;
+  const callId = params.id;
+  const { user } = useUser();
+  const firestore = useFirestore();
+
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [callJoined, setCallJoined] = useState(false);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  const firestore = useFirestore();
+  // --- Chat Logic ---
+  const messagesCollectionRef = useMemoFirebase(
+    () =>
+      firestore && callId
+        ? collection(firestore, 'calls', callId, 'messages')
+        : null,
+    [firestore, callId]
+  );
+
+  const messagesQuery = useMemoFirebase(
+    () =>
+      messagesCollectionRef
+        ? query(messagesCollectionRef, orderBy('timestamp', 'asc'))
+        : null,
+    [messagesCollectionRef]
+  );
+
+  const { data: messages } = useCollection<Message>(messagesQuery, { enabled: isChatOpen });
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !user || !messagesCollectionRef) return;
+
+    const messageData = {
+      text: newMessage,
+      senderId: user.uid,
+      senderName: user.displayName || 'Anonymous',
+      timestamp: serverTimestamp(),
+    };
+
+    addDocumentNonBlocking(messagesCollectionRef, messageData);
+    setNewMessage('');
+  };
+  // --- End Chat Logic ---
 
   useEffect(() => {
     if (callJoined && localStream && localVideoRef.current) {
@@ -70,15 +133,12 @@ export default function ConsultationPage({
       setRemoteStream(newRemoteStream);
     });
 
-    // Determine role (caller vs joiner) by checking for an existing offer
     const callDocRef = doc(firestore, 'calls', callId);
     const callDoc = await getDoc(callDocRef);
 
     if (callDoc.exists() && callDoc.data().offer) {
-      // Offer exists, so we are the joiner
       await joinCall(firestore, callId, stream);
     } else {
-      // No offer, so we are the caller
       await startCall(firestore, callId, stream);
     }
   };
@@ -102,14 +162,19 @@ export default function ConsultationPage({
   };
 
   const endCall = () => {
-    // Stop all media tracks
     localStream?.getTracks().forEach((track) => track.stop());
     remoteStream?.getTracks().forEach((track) => track.stop());
-
     hangUp();
-
-    // Navigate away
-    window.location.href = '/dashboard';
+    window.location.href = '/dashboard/consultations';
+  };
+  
+  const getInitials = (name?: string | null) => {
+    if (!name) return '';
+    const names = name.split(' ');
+    if (names.length > 1) {
+      return `${names[0][0]}${names[names.length - 1][0]}`;
+    }
+    return name.substring(0, 2);
   };
 
   if (!callJoined) {
@@ -126,45 +191,108 @@ export default function ConsultationPage({
 
   return (
     <div className="relative flex h-screen w-full flex-col bg-black text-white">
-      {/* Main video grid */}
-      <div className="grid flex-1 grid-cols-1 gap-2 p-2 md:grid-cols-2">
-        {/* Remote video (Doctor/Other person) */}
-        <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
-          <video
-            ref={remoteVideoRef}
-            className="h-full w-full object-cover"
-            autoPlay
-            playsInline
-          />
-          {!remoteStream?.active && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-              <p className="mt-2 text-white/70">
-                Waiting for the other person to join...
-              </p>
+      <div className="flex flex-1 overflow-hidden">
+        <div className={cn("flex-1 transition-all duration-300")}>
+          <div className="grid h-full flex-1 grid-cols-1 gap-2 p-2 md:grid-cols-2">
+            <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
+              <video
+                ref={remoteVideoRef}
+                className="h-full w-full object-cover"
+                autoPlay
+                playsInline
+              />
+              {!remoteStream?.active && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+                  <p className="mt-2 text-white/70">
+                    Waiting for the other person to join...
+                  </p>
+                </div>
+              )}
+              <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
+                Remote
+              </div>
             </div>
-          )}
-          <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
-            Remote
+
+            <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
+              <video
+                ref={localVideoRef}
+                className="h-full w-full -scale-x-100 object-cover"
+                autoPlay
+                muted
+                playsInline
+              />
+              {!isCameraOn && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
+                  <VideoOff className="h-16 w-16 text-white/70" />
+                  <p className="mt-2 text-white/70">Your camera is off</p>
+                </div>
+              )}
+              <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
+                You
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Local video (You) */}
-        <div className="relative flex items-center justify-center overflow-hidden rounded-lg bg-gray-900">
-          <video
-            ref={localVideoRef}
-            className="h-full w-full -scale-x-100 object-cover"
-            autoPlay
-            muted
-            playsInline
-          />
-          {!isCameraOn && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 p-4">
-              <VideoOff className="h-16 w-16 text-white/70" />
-              <p className="mt-2 text-white/70">Your camera is off</p>
-            </div>
+        {/* Chat Panel */}
+        <div
+          className={cn(
+            'flex h-full flex-col bg-gray-900/80 backdrop-blur-sm transition-all duration-300',
+            isChatOpen ? 'w-full max-w-sm border-l border-gray-700' : 'w-0'
           )}
-          <div className="absolute bottom-2 left-2 rounded-md bg-black/50 px-2 py-1 text-sm">
-            You
+        >
+          <div className="flex-1 overflow-hidden">
+             {isChatOpen && (
+                 <div className="flex h-full flex-col">
+                    <div className="flex items-center justify-between border-b border-gray-700 p-4">
+                        <h2 className="text-xl font-bold">Chat</h2>
+                        <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)}>
+                            <X className="h-6 w-6"/>
+                        </Button>
+                    </div>
+                     <ScrollArea className="flex-1 p-4">
+                       <div className="flex flex-col gap-4">
+                        {messages?.map((msg, index) => (
+                          <div
+                            key={index}
+                            className={cn(
+                              'flex items-start gap-3',
+                              msg.senderId === user?.uid ? 'flex-row-reverse' : ''
+                            )}
+                          >
+                             <Avatar className="h-8 w-8">
+                                <AvatarFallback>{getInitials(msg.senderName)}</AvatarFallback>
+                            </Avatar>
+                            <div
+                              className={cn(
+                                'max-w-xs rounded-lg p-3 text-sm',
+                                msg.senderId === user?.uid
+                                  ? 'rounded-br-none bg-primary text-primary-foreground'
+                                  : 'rounded-bl-none bg-gray-700'
+                              )}
+                            >
+                              <p className="font-bold">{msg.senderName}</p>
+                              <p>{msg.text}</p>
+                            </div>
+                          </div>
+                        ))}
+                        </div>
+                    </ScrollArea>
+                    <div className="border-t border-gray-700 p-4">
+                        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                            <Input 
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                placeholder="Type a message..."
+                                className="flex-1 bg-gray-800 border-gray-700 text-white"
+                            />
+                            <Button type="submit" size="icon" disabled={!newMessage.trim()}>
+                                <Send className="h-4 w-4" />
+                            </Button>
+                        </form>
+                    </div>
+                 </div>
+             )}
           </div>
         </div>
       </div>
@@ -215,6 +343,7 @@ export default function ConsultationPage({
                   variant="ghost"
                   size="icon"
                   className="h-12 w-12 rounded-full text-white hover:bg-white/10 hover:text-white"
+                   onClick={() => setIsChatOpen(!isChatOpen)}
                 >
                   <MessageSquare className="h-6 w-6" />
                 </Button>

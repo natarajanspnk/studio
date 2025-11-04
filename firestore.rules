@@ -51,12 +51,13 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
       
       match /offerCandidates/{candidateId} {
-        allow create: if isSignedIn();
-        allow read: if isSignedIn();
+        allow create, read: if isSignedIn();
       }
       match /answerCandidates/{candidateId} {
-        allow create: if isSignedIn();
-        allow read: if isSignedIn();
+        allow create, read: if isSignedIn();
+      }
+      match /messages/{messageId} {
+        allow read, create: if isSignedIn();
       }
     }
   }
