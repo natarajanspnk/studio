@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -30,6 +30,7 @@ import {
   useFirestore,
   useMemoFirebase,
   useUser,
+  useDoc
 } from '@/firebase';
 import { collection, collectionGroup, doc, query, where } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
@@ -79,6 +80,19 @@ export default function AppointmentsPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
+  const [userRole, setUserRole] = useState<'patient' | 'doctor' | null>(null);
+
+  // Determine user role
+  const patientDocRef = useMemoFirebase(() => user ? doc(firestore, 'patients', user.uid) : null, [user, firestore]);
+  const doctorDocRef = useMemoFirebase(() => user ? doc(firestore, 'doctors', user.uid) : null, [user, firestore]);
+  const { data: patientData, isLoading: isPatientLoading } = useDoc(patientDocRef);
+  const { data: doctorData, isLoading: isDoctorLoading } = useDoc(doctorDocRef);
+
+  useEffect(() => {
+    if (patientData) setUserRole('patient');
+    else if (doctorData) setUserRole('doctor');
+  }, [patientData, doctorData]);
+
 
   // 1. Fetch all doctors
   const doctorsCollection = useMemoFirebase(
@@ -87,10 +101,10 @@ export default function AppointmentsPage() {
   );
   const { data: doctors, isLoading: isDoctorsLoading } = useCollection<Doctor>(doctorsCollection);
   
-  // 2. Fetch all appointments (across all doctors)
+  // 2. Fetch all appointments (across all doctors) - ONLY if user is a doctor
   const allAppointmentsQuery = useMemoFirebase(
-    () => (firestore ? collectionGroup(firestore, 'appointments') : null),
-    [firestore]
+    () => (firestore && userRole === 'doctor' ? collectionGroup(firestore, 'appointments') : null),
+    [firestore, userRole]
   );
   const { data: allAppointments, isLoading: isAppointmentsLoading } = useCollection<Appointment>(allAppointmentsQuery);
   
@@ -217,7 +231,7 @@ export default function AppointmentsPage() {
     setSelectedSlot({ doctor, time });
   };
   
-  const isLoading = isDoctorsLoading || isAppointmentsLoading;
+  const isLoading = isDoctorsLoading || isAppointmentsLoading || isPatientLoading || isDoctorLoading;
 
   return (
     <div className="space-y-8">
@@ -337,7 +351,7 @@ export default function AppointmentsPage() {
                     <h4 className="mb-2 font-semibold">Available Slots</h4>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                       {timeSlots.map((time) => {
-                        const isSlotBooked = bookedSlots.has(`${doctor.id}-${time}`);
+                        const isSlotBooked = userRole === 'doctor' && bookedSlots.has(`${doctor.id}-${time}`);
                         return (
                         <AlertDialogTrigger asChild key={time}>
                           <Button
