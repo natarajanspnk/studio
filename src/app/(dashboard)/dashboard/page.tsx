@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -11,8 +12,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ArrowRight, Calendar, Plus, Stethoscope, Video } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { placeholderImages } from '@/lib/placeholder-images';
 import { useUser } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -20,7 +19,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const { user, isUserLoading } = useUser();
-  const doctorAvatar = placeholderImages.find((img) => img.id === 'doctor-1');
 
   return (
     <div className="grid gap-8">
@@ -38,54 +36,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="flex flex-col">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              <span>Upcoming Appointment</span>
-            </CardTitle>
-            <CardDescription>
-              You have an upcoming consultation.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-4">
-            <div className="flex items-center space-x-4 rounded-md border p-4">
-              <Avatar>
-                {doctorAvatar && (
-                  <AvatarImage
-                    src={doctorAvatar.imageUrl}
-                    alt={doctorAvatar.description}
-                    data-ai-hint={doctorAvatar.imageHint}
-                  />
-                )}
-                <AvatarFallback>EC</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium leading-none">
-                  Dr. Emily Carter
-                </p>
-                <p className="text-sm text-muted-foreground">Cardiologist</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-semibold">
-                Tomorrow, May 25, 2024 at 10:30 AM
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Video Consultation
-              </p>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full" asChild>
-              <Link href="/consultation/123">
-                <Video className="mr-2 h-4 w-4" />
-                Join Call
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -132,6 +82,30 @@ export default function DashboardPage() {
             <Button className="w-full" asChild>
               <Link href="/dashboard/appointments">
                 Book Now <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
+        
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Video className="h-5 w-5 text-primary" />
+              <span>Your Consultations</span>
+            </CardTitle>
+            <CardDescription>
+              Join your scheduled video calls.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1">
+            <p>
+             Check your upcoming appointments and join the video call at the scheduled time.
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button variant="outline" className="w-full" asChild>
+              <Link href="/dashboard/consultations">
+                View Consultations <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardFooter>
