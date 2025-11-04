@@ -16,25 +16,25 @@ import { ThemeToggle } from '@/components/theme-toggle';
 
 const features = [
   {
-    icon: <HeartPulse className="h-10 w-10 text-primary" />,
+    icon: <HeartPulse className="h-8 w-8 text-primary" />,
     title: 'Online Appointment Booking',
     description:
       'Easily schedule appointments with our specialists through an intuitive online calendar system.',
   },
   {
-    icon: <Video className="h-10 w-10 text-primary" />,
+    icon: <Video className="h-8 w-8 text-primary" />,
     title: 'Real-time Video Consultation',
     description:
       'Connect with doctors face-to-face through high-quality, real-time video calls from anywhere.',
   },
   {
-    icon: <FileText className="h-10 w-10 text-primary" />,
+    icon: <FileText className="h-8 w-8 text-primary" />,
     title: 'Electronic Health Records',
     description:
       'Your complete medical history, prescriptions, and lab results stored securely in one place.',
   },
   {
-    icon: <BrainCircuit className="h-10 w-10 text-primary" />,
+    icon: <BrainCircuit className="h-8 w-8 text-primary" />,
     title: 'AI Symptom Checker',
     description:
       'Get preliminary insights into your symptoms with our AI-powered tool before your consultation.',
@@ -45,7 +45,7 @@ export default function Home() {
   const heroImage = placeholderImages.find((img) => img.id === 'hero-landing');
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
         <Logo />
         <nav className="flex items-center gap-2">
@@ -61,9 +61,9 @@ export default function Home() {
 
       <main className="flex-1">
         <section className="relative w-full py-12 md:py-24 lg:py-32">
-          <div className="container mx-auto grid items-center gap-8 px-4 md:grid-cols-2 md:px-6">
+          <div className="container mx-auto grid items-center gap-12 px-4 md:grid-cols-2 md:px-6">
             <div className="space-y-6">
-              <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
+              <h1 className="font-headline text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 Your Health,
                 <br />
                 Connected.
@@ -82,7 +82,7 @@ export default function Home() {
                 </Button>
               </div>
             </div>
-            <div className="relative h-64 w-full overflow-hidden rounded-xl shadow-2xl md:h-auto md:aspect-square">
+            <div className="relative h-64 w-full overflow-hidden rounded-xl md:h-auto md:aspect-square">
               {heroImage && (
                 <Image
                   src={heroImage.imageUrl}
@@ -100,11 +100,11 @@ export default function Home() {
 
         <section
           id="features"
-          className="w-full bg-white py-12 md:py-24 lg:py-32 dark:bg-background"
+          className="w-full bg-secondary/30 py-12 md:py-24 lg:py-32"
         >
           <div className="container mx-auto px-4 md:px-6">
             <div className="mx-auto mb-12 max-w-2xl text-center">
-              <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+              <h2 className="font-headline text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
                 Comprehensive Care at Your Fingertips
               </h2>
               <p className="mt-4 text-lg text-muted-foreground">
@@ -116,13 +116,11 @@ export default function Home() {
               {features.map((feature) => (
                 <Card
                   key={feature.title}
-                  className="transform-gpu transition-all duration-300 hover:-translate-y-2 hover:shadow-xl dark:bg-card"
+                  className="transform-gpu border-none bg-transparent shadow-none transition-all duration-300"
                 >
-                  <CardHeader className="items-center">
-                    {feature.icon}
-                  </CardHeader>
+                  <CardHeader className="items-center">{feature.icon}</CardHeader>
                   <CardContent className="text-center">
-                    <CardTitle className="mb-2 font-headline text-xl">
+                    <CardTitle className="mb-2 font-headline text-xl font-semibold">
                       {feature.title}
                     </CardTitle>
                     <p className="text-muted-foreground">
@@ -138,10 +136,10 @@ export default function Home() {
         <section className="w-full py-12 md:py-24 lg:py-32">
           <div className="container mx-auto grid items-center gap-8 px-4 md:grid-cols-2 md:px-6">
             <div className="space-y-4">
-              <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm">
+              <div className="inline-block rounded-lg bg-accent px-3 py-1 text-sm font-medium text-accent-foreground">
                 Security First
               </div>
-              <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-4xl">
+              <h2 className="font-headline text-3xl font-bold tracking-tight sm:text-4xl">
                 Your Privacy is Our Priority
               </h2>
               <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
@@ -152,13 +150,13 @@ export default function Home() {
               </p>
             </div>
             <div className="flex items-center justify-center">
-              <ShieldCheck className="h-32 w-32 text-accent" />
+              <ShieldCheck className="h-32 w-32 text-primary" />
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="w-full bg-white py-6 dark:bg-background">
+      <footer className="w-full border-t bg-background py-6">
         <div className="container mx-auto flex flex-col items-center justify-between px-4 md:flex-row md:px-6">
           <Logo />
           <p className="text-sm text-muted-foreground">

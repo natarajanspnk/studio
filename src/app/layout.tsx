@@ -4,12 +4,23 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/components/theme-provider';
+import { Poppins, Inter } from 'next/font/google';
 
 export const metadata: Metadata = {
   title: 'MedConnect: Your Health, Connected.',
   description:
     'MedConnect offers seamless, secure, and personalized telemedicine services. Connect with trusted healthcare professionals from the comfort of your home.',
 };
+
+const fontBody = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-body',
+});
+const fontHeadline = Inter({
+  subsets: ['latin'],
+  variable: '--font-headline',
+});
 
 export default function RootLayout({
   children,
@@ -18,23 +29,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap"
-          rel="stylesheet"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={cn('min-h-screen bg-background font-body antialiased')}>
+      <body
+        className={cn(
+          'min-h-screen bg-background font-body antialiased',
+          fontBody.variable,
+          fontHeadline.variable
+        )}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
