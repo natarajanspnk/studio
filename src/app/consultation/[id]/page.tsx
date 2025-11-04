@@ -21,7 +21,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ConsultationPreview } from './preview';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import {
   createPeerConnection,
   startCall,
@@ -42,6 +42,7 @@ import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { WithId } from '@/firebase/firestore/use-collection';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { LoadingSpinner } from '@/components/loading-spinner';
 
 type Message = {
   text: string;
@@ -59,7 +60,7 @@ export default function ConsultationPage({
   params: { id: string };
 }) {
   const callId = params.id;
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
   const [isMicOn, setIsMicOn] = useState(true);
@@ -69,6 +70,20 @@ export default function ConsultationPage({
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  const [userRole, setUserRole] = useState<'patient' | 'doctor' | null>(null);
+
+
+  // Determine user role
+  const patientDocRef = useMemoFirebase(() => user ? doc(firestore, 'patients', user.uid) : null, [user, firestore]);
+  const doctorDocRef = useMemoFirebase(() => user ? doc(firestore, 'doctors', user.uid) : null, [user, firestore]);
+  const { data: patientData, isLoading: isPatientLoading } = useDoc(patientDocRef);
+  const { data: doctorData, isLoading: isDoctorLoading } = useDoc(doctorDocRef);
+
+  useEffect(() => {
+    if (patientData) setUserRole('patient');
+    else if (doctorData) setUserRole('doctor');
+  }, [patientData, doctorData]);
+
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -165,7 +180,12 @@ export default function ConsultationPage({
     localStream?.getTracks().forEach((track) => track.stop());
     remoteStream?.getTracks().forEach((track) => track.stop());
     hangUp();
-    window.location.href = '/dashboard/consultations';
+    // Role-based redirect
+    if (userRole === 'doctor') {
+      window.location.href = '/dashboard/staff';
+    } else {
+      window.location.href = '/dashboard/consultations';
+    }
   };
   
   const getInitials = (name?: string | null) => {
@@ -176,11 +196,17 @@ export default function ConsultationPage({
     }
     return name.substring(0, 2);
   };
+  
+  const isLoading = isUserLoading || isPatientLoading || isDoctorLoading;
+
+  if (isLoading) {
+    return <div className="flex h-screen w-full items-center justify-center"><LoadingSpinner /></div>
+  }
 
   if (!callJoined) {
     return (
       <ConsultationPreview
-        onJoinCall={handleJoinCall}
+        onJoinCall={(stream) => handleJoinCall(stream)}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
         setIsMicOn={setIsMicOn}
