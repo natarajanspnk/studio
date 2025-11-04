@@ -31,7 +31,7 @@ import {
   useMemoFirebase,
   useUser,
 } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, collectionGroup, doc, query, where } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { WithId } from '@/firebase/firestore/use-collection';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -43,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { format, startOfDay } from 'date-fns';
 
 type Doctor = {
   id: string;
@@ -52,6 +53,12 @@ type Doctor = {
   isAvailable: boolean;
   address: string;
 };
+
+type Appointment = {
+    id: string;
+    doctorId: string;
+    dateTime: string;
+}
 
 const timeSlots = [
   '09:00 AM',
@@ -72,11 +79,41 @@ export default function AppointmentsPage() {
   const { toast } = useToast();
   const { user } = useUser();
   const firestore = useFirestore();
+
+  // 1. Fetch all doctors
   const doctorsCollection = useMemoFirebase(
     () => (firestore ? collection(firestore, 'doctors') : null),
     [firestore]
   );
-  const { data: doctors, isLoading } = useCollection<Doctor>(doctorsCollection);
+  const { data: doctors, isLoading: isDoctorsLoading } = useCollection<Doctor>(doctorsCollection);
+  
+  // 2. Fetch all appointments (across all doctors)
+  const allAppointmentsQuery = useMemoFirebase(
+    () => (firestore ? collectionGroup(firestore, 'appointments') : null),
+    [firestore]
+  );
+  const { data: allAppointments, isLoading: isAppointmentsLoading } = useCollection<Appointment>(allAppointmentsQuery);
+  
+  // 3. Create a lookup for booked slots
+  const bookedSlots = useMemo(() => {
+    if (!allAppointments || !date) return new Set();
+
+    const selectedDateStr = format(date, 'yyyy-MM-dd');
+    const booked = new Set<string>();
+
+    allAppointments.forEach(appt => {
+        const apptDate = new Date(appt.dateTime);
+        const apptDateStr = format(apptDate, 'yyyy-MM-dd');
+        
+        if (apptDateStr === selectedDateStr) {
+            const timeStr = format(apptDate, 'hh:mm a');
+            const key = `${appt.doctorId}-${timeStr}`;
+            booked.add(key);
+        }
+    });
+    
+    return booked;
+  }, [allAppointments, date]);
 
   const [specialtyFilter, setSpecialtyFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState('');
@@ -179,6 +216,8 @@ export default function AppointmentsPage() {
   const handleTriggerClick = (doctor: WithId<Doctor>, time: string) => {
     setSelectedSlot({ doctor, time });
   };
+  
+  const isLoading = isDoctorsLoading || isAppointmentsLoading;
 
   return (
     <div className="space-y-8">
@@ -297,17 +336,19 @@ export default function AppointmentsPage() {
                   <CardContent>
                     <h4 className="mb-2 font-semibold">Available Slots</h4>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                      {timeSlots.map((time) => (
+                      {timeSlots.map((time) => {
+                        const isSlotBooked = bookedSlots.has(`${doctor.id}-${time}`);
+                        return (
                         <AlertDialogTrigger asChild key={time}>
                           <Button
                             variant="outline"
-                            disabled={!doctor.isAvailable}
+                            disabled={!doctor.isAvailable || isSlotBooked}
                             onClick={() => handleTriggerClick(doctor, time)}
                           >
                             {time}
                           </Button>
                         </AlertDialogTrigger>
-                      ))}
+                      )})}
                     </div>
                   </CardContent>
                 </Card>
@@ -360,4 +401,3 @@ export default function AppointmentsPage() {
     </div>
   );
 }
-
