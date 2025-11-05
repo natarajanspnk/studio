@@ -22,9 +22,8 @@ import {
 import { ConsultationPreview } from './preview';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import {
-  createPeerConnection,
-  startCall,
   joinCall,
+  startCall,
 } from '@/lib/webrtc';
 import {
   collection,
@@ -34,13 +33,17 @@ import {
   orderBy,
   serverTimestamp,
   addDoc,
+  Unsubscribe,
+  setDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LoadingSpinner } from '@/components/loading-spinner';
+import { useToast } from '@/hooks/use-toast';
 
 type Message = {
   text: string;
@@ -52,6 +55,13 @@ type Message = {
   };
 };
 
+type CallData = {
+    patientPresent?: boolean;
+    doctorPresent?: boolean;
+    patientName?: string;
+    doctorName?: string;
+}
+
 export default function ConsultationPage({
   params,
 }: {
@@ -60,6 +70,7 @@ export default function ConsultationPage({
   const { id: callId } = use(params);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -76,7 +87,6 @@ export default function ConsultationPage({
   
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const unsubscribeListenersRef = useRef<(() => void)[]>([]);
-
 
   // Determine user role and get appointment
   const patientDocRef = useMemoFirebase(() => (firestore && user ? doc(firestore, 'patients', user.uid) : null), [user, firestore]);
@@ -117,6 +127,73 @@ export default function ConsultationPage({
 
   }, [user, firestore, callId, doctorDocRef, patientDocRef]);
 
+  // Presence and Notification Logic
+  const callDocRef = useMemoFirebase(() => (firestore ? doc(firestore, 'calls', callId) : null), [firestore, callId]);
+  const callDataRef = useRef<CallData | null>(null);
+
+  useEffect(() => {
+    if (!callDocRef || !userRole) return;
+  
+    const unsubscribe = onSnapshot(callDocRef, (snapshot) => {
+      const newCallData = snapshot.data() as CallData;
+      const oldCallData = callDataRef.current;
+  
+      if (oldCallData) { // Only show notifications after initial state is set
+        if (userRole === 'doctor' && newCallData.patientPresent && !oldCallData.patientPresent) {
+          toast({ title: `${newCallData.patientName || 'Patient'} has joined the call.` });
+        } else if (userRole === 'doctor' && !newCallData.patientPresent && oldCallData.patientPresent) {
+          toast({ title: `${newCallData.patientName || 'Patient'} has left the call.`, variant: 'destructive' });
+        }
+  
+        if (userRole === 'patient' && newCallData.doctorPresent && !oldCallData.doctorPresent) {
+          toast({ title: `${newCallData.doctorName || 'Doctor'} has joined the call.` });
+        } else if (userRole === 'patient' && !newCallData.doctorPresent && oldCallData.doctorPresent) {
+          toast({ title: `${newCallData.doctorName || 'Doctor'} has left the call.`, variant: 'destructive' });
+        }
+      }
+  
+      callDataRef.current = newCallData;
+    });
+  
+    return () => unsubscribe();
+  }, [callDocRef, userRole, toast]);
+  
+  const updatePresence = (isPresent: boolean) => {
+    if (!callDocRef || !userRole || !user?.displayName) return;
+  
+    const presenceUpdate: Partial<CallData> = isPresent
+      ? {
+          [`${userRole}Present`]: true,
+          [`${userRole}Name`]: user.displayName,
+        }
+      : {
+          [`${userRole}Present`]: false,
+        };
+  
+    setDocumentNonBlocking(callDocRef, presenceUpdate, { merge: true });
+  };
+  
+  // Handle user leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (callJoined) {
+        updatePresence(false);
+      }
+    };
+  
+    window.addEventListener('beforeunload', handleBeforeUnload);
+  
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Final attempt to set presence to false on component unmount
+      if (callJoined) {
+        updatePresence(false);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callJoined, userRole]);
+
+
   // --- WebRTC Logic ---
   useEffect(() => {
     if (callJoined && localStream && localVideoRef.current) {
@@ -134,20 +211,24 @@ export default function ConsultationPage({
     setLocalStream(stream);
     setCallJoined(true);
 
-    if (!firestore) {
-      console.error('Firestore is not available');
+    if (!firestore || !userRole) {
+      console.error('Firestore or user role is not available');
       return;
     }
+    
+    updatePresence(true);
 
     // Clean up previous listeners
     hangUp();
 
-    peerConnectionRef.current = createPeerConnection((event) => {
+    peerConnectionRef.current = new RTCPeerConnection(undefined);
+    
+    peerConnectionRef.current.ontrack = (event) => {
         const newRemoteStream = event.streams[0];
         setRemoteStream(newRemoteStream);
-    });
-    
-    const callDocRef = doc(firestore, 'calls', callId);
+    };
+
+    if (!callDocRef) return;
     const callDoc = await getDoc(callDocRef);
     
     const onIceCandidate = (candidate: RTCIceCandidate) => {
@@ -175,6 +256,8 @@ export default function ConsultationPage({
   }
 
   const endCall = () => {
+    updatePresence(false);
+
     localStream?.getTracks().forEach((track) => track.stop());
     setLocalStream(null);
     setRemoteStream(null);
@@ -466,3 +549,5 @@ export default function ConsultationPage({
     </div>
   );
 }
+
+    

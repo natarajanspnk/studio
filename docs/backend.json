@@ -194,7 +194,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Call",
       "type": "object",
-      "description": "Represents the signaling data for a WebRTC call.",
+      "description": "Represents the signaling and presence data for a WebRTC call.",
       "properties": {
         "offer": {
           "type": "object",
@@ -209,6 +209,22 @@
             "type": { "type": "string" },
             "sdp": { "type": "string" }
           }
+        },
+        "patientPresent": {
+          "type": "boolean",
+          "description": "Indicates if the patient is currently in the call."
+        },
+        "doctorPresent": {
+          "type": "boolean",
+          "description": "Indicates if the doctor is currently in the call."
+        },
+        "patientName": {
+            "type": "string",
+            "description": "The display name of the patient in the call."
+        },
+        "doctorName": {
+            "type": "string",
+            "description": "The display name of the doctor in the call."
         }
       }
     },
@@ -354,7 +370,7 @@
         "definition": {
           "entityName": "Call",
           "schema": { "$ref": "#/backend/entities/Call" },
-          "description": "Stores WebRTC signaling data for a video call. Any authenticated user can create or join a call.",
+          "description": "Stores WebRTC signaling and presence data for a video call. Any authenticated user can create or join a call.",
           "params": [
             { "name": "callId", "description": "Unique ID for the call session." }
           ]
@@ -397,6 +413,7 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to ensure data privacy, security, and scalability for the MedConnect platform. It uses path-based ownership for user-specific data and denormalization to avoid complex queries and maintain authorization independence. The structure supports secure `list` operations via structural segregation. Appointments are organized as a subcollection of both patients and doctors to allow for easy querying from either perspective. HealthRecords are tied directly to a patient using a subcollection, ensuring only the patient (or authorized doctors, if implemented via a membership map in the health record) can access them. This design eliminates the need for `get()` calls in security rules, simplifying the rule structure and improving performance. The design employs the 'private data' access model for Patients and Doctors profile data. The `calls` collection and its subcollections are added for WebRTC signaling, with open access for authenticated users to facilitate call setup. A 'messages' subcollection is added to 'calls' to enable real-time chat during video consultations."
+    "reasoning": "The Firestore structure is designed to ensure data privacy, security, and scalability for the MedConnect platform. It uses path-based ownership for user-specific data and denormalization to avoid complex queries and maintain authorization independence. The structure supports secure `list` operations via structural segregation. Appointments are organized as a subcollection of both patients and doctors to allow for easy querying from either perspective. HealthRecords are tied directly to a patient using a subcollection, ensuring only the patient (or authorized doctors, if implemented via a membership map in the health record) can access them. This design eliminates the need for `get()` calls in security rules, simplifying the rule structure and improving performance. The design employs the 'private data' access model for Patients and Doctors profile data. The `calls` collection and its subcollections are added for WebRTC signaling, with open access for authenticated users to facilitate call setup. A 'messages' subcollection is added to 'calls' to enable real-time chat during video consultations. Presence-related fields have been added to the 'Call' entity to support real-time notifications."
   }
 }
+    
