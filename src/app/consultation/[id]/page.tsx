@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   Mic,
   MicOff,
@@ -20,11 +20,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ConsultationPreview } from './preview';
-import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import {
   createPeerConnection,
   startCall,
   joinCall,
+  hangUp,
 } from '@/lib/webrtc';
 import {
   collection,
@@ -56,6 +57,7 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
+  const callId = params.id;
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
@@ -69,6 +71,10 @@ export default function ConsultationPage({
   const [userRole, setUserRole] = useState<'patient' | 'doctor' | null>(null);
   const [appointment, setAppointment] = useState<any>(null);
 
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   // Determine user role and get appointment
   const patientDocRef = useMemoFirebase(() => user ? doc(firestore, 'patients', user.uid) : null, [user, firestore]);
@@ -78,18 +84,15 @@ export default function ConsultationPage({
     const determineRoleAndGetAppointment = async () => {
         if (!user || !firestore) return;
         
-        const callId = params.id;
         let foundRole: 'patient' | 'doctor' | null = null;
         let appointmentDoc;
         
-        // Check if user is a doctor
         const doctorDocSnap = await getDoc(doctorDocRef!);
         if (doctorDocSnap.exists()) {
             foundRole = 'doctor';
             const appointmentRef = doc(firestore, 'doctors', user.uid, 'appointments', callId);
             appointmentDoc = await getDoc(appointmentRef);
         } else {
-             // Check if user is a patient
             const patientDocSnap = await getDoc(patientDocRef!);
             if (patientDocSnap.exists()) {
                 foundRole = 'patient';
@@ -106,19 +109,71 @@ export default function ConsultationPage({
     
     determineRoleAndGetAppointment();
 
-  }, [user, firestore, params.id, doctorDocRef, patientDocRef]);
+  }, [user, firestore, callId, doctorDocRef, patientDocRef]);
 
+  // --- WebRTC Logic ---
+  useEffect(() => {
+    if (callJoined && localStream && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, callJoined]);
 
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (callJoined && remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream, callJoined]);
+
+  const handleJoinCall = async (stream: MediaStream) => {
+    setLocalStream(stream);
+    setCallJoined(true);
+
+    if (!firestore) {
+      console.error('Firestore is not available');
+      return;
+    }
+
+    peerConnectionRef.current = createPeerConnection(firestore, callId, (newRemoteStream) => {
+      setRemoteStream(newRemoteStream);
+    });
+
+    const callDocRef = doc(firestore, 'calls', callId);
+    const callDoc = await getDoc(callDocRef);
+
+    if (callDoc.exists() && callDoc.data().offer) {
+      await joinCall(peerConnectionRef.current, firestore, callId, stream);
+    } else {
+      await startCall(peerConnectionRef.current, firestore, callId, stream);
+    }
+  };
+
+  const endCall = () => {
+    localStream?.getTracks().forEach((track) => track.stop());
+    remoteStream?.getTracks().forEach((track) => track.stop());
+    
+    // Disconnects from the call but keeps the room available for rejoin
+    if (peerConnectionRef.current) {
+        hangUp(peerConnectionRef.current);
+        peerConnectionRef.current = null;
+    }
+    
+    // Role-based redirect
+    if (userRole === 'doctor') {
+      window.location.href = '/dashboard/staff';
+    } else {
+      window.location.href = '/dashboard/consultations';
+    }
+  };
+  // --- End WebRTC Logic ---
+
 
   // --- Chat Logic ---
   const messagesCollectionRef = useMemoFirebase(
     () =>
-      firestore && params.id
-        ? collection(firestore, 'calls', params.id, 'messages')
+      firestore && callId
+        ? collection(firestore, 'calls', callId, 'messages')
         : null,
-    [firestore, params.id]
+    [firestore, callId]
   );
 
   const messagesQuery = useMemoFirebase(
@@ -147,41 +202,8 @@ export default function ConsultationPage({
   };
   // --- End Chat Logic ---
 
-  useEffect(() => {
-    if (callJoined && localStream && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream, callJoined]);
 
-  useEffect(() => {
-    if (callJoined && remoteStream && remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream, callJoined]);
-
-  const handleJoinCall = async (stream: MediaStream, callId: string) => {
-    setLocalStream(stream);
-    setCallJoined(true);
-
-    if (!firestore) {
-      console.error('Firestore is not available');
-      return;
-    }
-
-    createPeerConnection(firestore, callId, (newRemoteStream) => {
-      setRemoteStream(newRemoteStream);
-    });
-
-    const callDocRef = doc(firestore, 'calls', callId);
-    const callDoc = await getDoc(callDocRef);
-
-    if (callDoc.exists() && callDoc.data().offer) {
-      await joinCall(firestore, callId, stream);
-    } else {
-      await startCall(firestore, callId, stream);
-    }
-  };
-
+  // --- Media Controls ---
   const toggleMic = () => {
     if (localStream) {
       localStream.getAudioTracks().forEach((track) => {
@@ -199,19 +221,9 @@ export default function ConsultationPage({
       setIsCameraOn(!isCameraOn);
     }
   };
+  // --- End Media Controls ---
 
-  const endCall = () => {
-    localStream?.getTracks().forEach((track) => track.stop());
-    remoteStream?.getTracks().forEach((track) => track.stop());
-    
-    // Role-based redirect
-    if (userRole === 'doctor') {
-      window.location.href = '/dashboard/staff';
-    } else {
-      window.location.href = '/dashboard/consultations';
-    }
-  };
-  
+
   const getInitials = (name?: string | null) => {
     if (!name) return '';
     const names = name.split(' ');
@@ -230,7 +242,7 @@ export default function ConsultationPage({
   if (!callJoined) {
     return (
       <ConsultationPreview
-        onJoinCall={(stream) => handleJoinCall(stream, params.id)}
+        onJoinCall={handleJoinCall}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
         setIsMicOn={setIsMicOn}
