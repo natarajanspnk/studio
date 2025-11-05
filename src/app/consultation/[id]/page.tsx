@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, use } from 'react';
 import {
   Mic,
   MicOff,
@@ -57,7 +57,7 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
-  const callId = params.id;
+  const { id: callId } = use(params);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
@@ -151,13 +151,11 @@ export default function ConsultationPage({
     localStream?.getTracks().forEach((track) => track.stop());
     remoteStream?.getTracks().forEach((track) => track.stop());
     
-    // Disconnects from the call but keeps the room available for rejoin
     if (peerConnectionRef.current) {
         hangUp(peerConnectionRef.current);
         peerConnectionRef.current = null;
     }
     
-    // Role-based redirect
     if (userRole === 'doctor') {
       window.location.href = '/dashboard/staff';
     } else {
