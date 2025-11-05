@@ -25,7 +25,6 @@ import {
   createPeerConnection,
   startCall,
   joinCall,
-  hangUp,
 } from '@/lib/webrtc';
 import {
   collection,
@@ -77,12 +76,12 @@ export default function ConsultationPage({
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
 
   // Determine user role and get appointment
-  const patientDocRef = useMemoFirebase(() => user ? doc(firestore, 'patients', user.uid) : null, [user, firestore]);
-  const doctorDocRef = useMemoFirebase(() => user ? doc(firestore, 'doctors', user.uid) : null, [user, firestore]);
+  const patientDocRef = useMemoFirebase(() => (firestore && user ? doc(firestore, 'patients', user.uid) : null), [user, firestore]);
+  const doctorDocRef = useMemoFirebase(() => (firestore && user ? doc(firestore, 'doctors', user.uid) : null), [user, firestore]);
 
   useEffect(() => {
     const determineRoleAndGetAppointment = async () => {
-        if (!user || !firestore) return;
+        if (!user || !firestore) return; // Wait for user and firestore
         
         let foundRole: 'patient' | 'doctor' | null = null;
         let appointmentDoc;
@@ -137,6 +136,11 @@ export default function ConsultationPage({
       setRemoteStream(newRemoteStream);
     });
 
+    if (!peerConnectionRef.current) {
+      console.error("Peer connection not created");
+      return;
+    }
+
     const callDocRef = doc(firestore, 'calls', callId);
     const callDoc = await getDoc(callDocRef);
 
@@ -152,7 +156,8 @@ export default function ConsultationPage({
     remoteStream?.getTracks().forEach((track) => track.stop());
     
     if (peerConnectionRef.current) {
-        hangUp(peerConnectionRef.current);
+        // We are not calling hangUp() here to allow rejoining
+        peerConnectionRef.current.close();
         peerConnectionRef.current = null;
     }
     
