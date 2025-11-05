@@ -79,10 +79,7 @@ export function ConsultationPreview({
          streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-  // The dependency array is updated to re-run the effect if the mic/camera state changes from the parent,
-  // which can indicate a "reset" or re-entry into the preview state.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
 
   const toggleMic = () => {
     if (streamRef.current) {
