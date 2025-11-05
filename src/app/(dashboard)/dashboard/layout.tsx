@@ -11,6 +11,7 @@ import {
   LogOut,
   Settings,
   Users,
+  Home,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -34,6 +35,7 @@ import { useMemoFirebase } from '@/firebase/provider';
 import { doc } from 'firebase/firestore';
 
 const patientNavItems = [
+  { href: '/', label: 'Home', icon: Home },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   {
     href: '/dashboard/symptom-checker',
