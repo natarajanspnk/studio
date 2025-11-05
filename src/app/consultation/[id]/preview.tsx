@@ -79,8 +79,8 @@ export function ConsultationPreview({
          streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
-  // We only want to run this once on mount, so we pass an empty dependency array.
-  // The isMicOn/isCameraOn props are only for initial state.
+  // The dependency array is updated to re-run the effect if the mic/camera state changes from the parent,
+  // which can indicate a "reset" or re-entry into the preview state.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
