@@ -42,9 +42,12 @@ export const createPeerConnection = (
       remoteStream.addTrack(track);
     });
   };
+
+  return peerConnection;
 };
 
 export const startCall = async (
+  peerConnection: RTCPeerConnection,
   firestore: Firestore,
   callId: string,
   localStream: MediaStream
@@ -56,7 +59,7 @@ export const startCall = async (
   const callDocRef = doc(firestore, 'calls', callId);
 
   localStream.getTracks().forEach((track) => {
-    peerConnection!.addTrack(track, localStream);
+    peerConnection.addTrack(track, localStream);
   });
   
   peerConnection.onicecandidate = async (event) => {
@@ -98,6 +101,7 @@ export const startCall = async (
 };
 
 export const joinCall = async (
+  peerConnection: RTCPeerConnection,
   firestore: Firestore,
   callId: string,
   localStream: MediaStream
@@ -114,7 +118,7 @@ export const joinCall = async (
   }
 
   localStream.getTracks().forEach((track) => {
-    peerConnection!.addTrack(track, localStream);
+    peerConnection.addTrack(track, localStream);
   });
   
   peerConnection.onicecandidate = async (event) => {
