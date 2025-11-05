@@ -81,6 +81,7 @@ export default function ConsultationPage({
   const [newMessage, setNewMessage] = useState('');
   const [userRole, setUserRole] = useState<'patient' | 'doctor' | null>(null);
   const [appointment, setAppointment] = useState<any>(null);
+  const [resetKey, setResetKey] = useState(0);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -261,8 +262,12 @@ export default function ConsultationPage({
     localStream?.getTracks().forEach((track) => track.stop());
     setLocalStream(null);
     setRemoteStream(null);
+    setCallJoined(false);
+    setResetKey(prev => prev + 1); // Force remount of preview
 
-    hangUp();
+    // We don't hangUp() here to allow rejoining.
+    // Instead we just stop local tracks and navigate away.
+    // The call room remains in Firestore.
     
     if (userRole === 'doctor') {
       window.location.href = '/dashboard/staff';
@@ -357,6 +362,7 @@ export default function ConsultationPage({
   if (!callJoined) {
     return (
       <ConsultationPreview
+        key={resetKey}
         onJoinCall={handleJoinCall}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
@@ -549,5 +555,7 @@ export default function ConsultationPage({
     </div>
   );
 }
+
+    
 
     
