@@ -33,6 +33,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  addDoc,
 } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -74,6 +75,8 @@ export default function ConsultationPage({
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const unsubscribeListenersRef = useRef<(() => void)[]>([]);
+
 
   // Determine user role and get appointment
   const patientDocRef = useMemoFirebase(() => (firestore && user ? doc(firestore, 'patients', user.uid) : null), [user, firestore]);
@@ -81,28 +84,32 @@ export default function ConsultationPage({
 
   useEffect(() => {
     const determineRoleAndGetAppointment = async () => {
-        if (!user || !firestore) return; // Wait for user and firestore
+        if (!user || !firestore) return;
         
         let foundRole: 'patient' | 'doctor' | null = null;
         let appointmentDoc;
         
-        const doctorDocSnap = await getDoc(doctorDocRef!);
-        if (doctorDocSnap.exists()) {
-            foundRole = 'doctor';
-            const appointmentRef = doc(firestore, 'doctors', user.uid, 'appointments', callId);
-            appointmentDoc = await getDoc(appointmentRef);
-        } else {
-            const patientDocSnap = await getDoc(patientDocRef!);
-            if (patientDocSnap.exists()) {
-                foundRole = 'patient';
-                const appointmentRef = doc(firestore, 'patients', user.uid, 'appointments', callId);
+        try {
+            const doctorDocSnap = await getDoc(doctorDocRef!);
+            if (doctorDocSnap.exists()) {
+                foundRole = 'doctor';
+                const appointmentRef = doc(firestore, 'doctors', user.uid, 'appointments', callId);
                 appointmentDoc = await getDoc(appointmentRef);
+            } else {
+                const patientDocSnap = await getDoc(patientDocRef!);
+                if (patientDocSnap.exists()) {
+                    foundRole = 'patient';
+                    const appointmentRef = doc(firestore, 'patients', user.uid, 'appointments', callId);
+                    appointmentDoc = await getDoc(appointmentRef);
+                }
             }
-        }
-        
-        setUserRole(foundRole);
-        if (appointmentDoc?.exists()) {
-            setAppointment(appointmentDoc.data());
+            
+            setUserRole(foundRole);
+            if (appointmentDoc?.exists()) {
+                setAppointment(appointmentDoc.data());
+            }
+        } catch (error) {
+            console.error("Error determining role or fetching appointment: ", error);
         }
     }
     
@@ -132,34 +139,47 @@ export default function ConsultationPage({
       return;
     }
 
-    peerConnectionRef.current = createPeerConnection(firestore, callId, (newRemoteStream) => {
-      setRemoteStream(newRemoteStream);
+    // Clean up previous listeners
+    hangUp();
+
+    peerConnectionRef.current = createPeerConnection((event) => {
+        const newRemoteStream = event.streams[0];
+        setRemoteStream(newRemoteStream);
     });
-
-    if (!peerConnectionRef.current) {
-      console.error("Peer connection not created");
-      return;
-    }
-
+    
     const callDocRef = doc(firestore, 'calls', callId);
     const callDoc = await getDoc(callDocRef);
+    
+    const onIceCandidate = (candidate: RTCIceCandidate) => {
+        const candidatesCollection = collection(firestore, 'calls', callId, userRole === 'doctor' ? 'answerCandidates' : 'offerCandidates');
+        addDoc(candidatesCollection, candidate.toJSON());
+    }
 
-    if (callDoc.exists() && callDoc.data().offer) {
-      await joinCall(peerConnectionRef.current, firestore, callId, stream);
+    if (callDoc.exists() && callDoc.data().offer && userRole === 'doctor') {
+      const cleanup = await joinCall(peerConnectionRef.current, firestore, callId, stream, onIceCandidate);
+      unsubscribeListenersRef.current.push(cleanup);
     } else {
-      await startCall(peerConnectionRef.current, firestore, callId, stream);
+      const cleanup = await startCall(peerConnectionRef.current, firestore, callId, stream, onIceCandidate);
+      unsubscribeListenersRef.current.push(cleanup);
     }
   };
 
-  const endCall = () => {
-    localStream?.getTracks().forEach((track) => track.stop());
-    remoteStream?.getTracks().forEach((track) => track.stop());
-    
+  const hangUp = () => {
+    unsubscribeListenersRef.current.forEach(unsub => unsub());
+    unsubscribeListenersRef.current = [];
+
     if (peerConnectionRef.current) {
-        // We are not calling hangUp() here to allow rejoining
         peerConnectionRef.current.close();
         peerConnectionRef.current = null;
     }
+  }
+
+  const endCall = () => {
+    localStream?.getTracks().forEach((track) => track.stop());
+    setLocalStream(null);
+    setRemoteStream(null);
+
+    hangUp();
     
     if (userRole === 'doctor') {
       window.location.href = '/dashboard/staff';
@@ -167,6 +187,15 @@ export default function ConsultationPage({
       window.location.href = '/dashboard/consultations';
     }
   };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+      return () => {
+        hangUp();
+        localStream?.getTracks().forEach(track => track.stop());
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // --- End WebRTC Logic ---
 
 
