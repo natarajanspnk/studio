@@ -8,7 +8,6 @@ import {
   Video,
   VideoOff,
   PhoneOff,
-  Users,
   MessageSquare,
   Send,
   X,
@@ -26,7 +25,6 @@ import {
   createPeerConnection,
   startCall,
   joinCall,
-  hangUp,
 } from '@/lib/webrtc';
 import {
   collection,
@@ -39,8 +37,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { WithId } from '@/firebase/firestore/use-collection';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LoadingSpinner } from '@/components/loading-spinner';
 
@@ -59,7 +56,6 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
-  const callId = params.id;
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
@@ -77,26 +73,25 @@ export default function ConsultationPage({
   // Determine user role and get appointment
   const patientDocRef = useMemoFirebase(() => user ? doc(firestore, 'patients', user.uid) : null, [user, firestore]);
   const doctorDocRef = useMemoFirebase(() => user ? doc(firestore, 'doctors', user.uid) : null, [user, firestore]);
-  const { data: patientData, isLoading: isPatientLoading } = useDoc(patientDocRef);
-  const { data: doctorData, isLoading: isDoctorLoading } = useDoc(doctorDocRef);
 
   useEffect(() => {
     const determineRoleAndGetAppointment = async () => {
         if (!user || !firestore) return;
         
+        const callId = params.id;
         let foundRole: 'patient' | 'doctor' | null = null;
         let appointmentDoc;
         
         // Check if user is a doctor
-        const doctorDoc = await getDoc(doctorDocRef!);
-        if (doctorDoc.exists()) {
+        const doctorDocSnap = await getDoc(doctorDocRef!);
+        if (doctorDocSnap.exists()) {
             foundRole = 'doctor';
             const appointmentRef = doc(firestore, 'doctors', user.uid, 'appointments', callId);
             appointmentDoc = await getDoc(appointmentRef);
         } else {
              // Check if user is a patient
-            const patientDoc = await getDoc(patientDocRef!);
-            if (patientDoc.exists()) {
+            const patientDocSnap = await getDoc(patientDocRef!);
+            if (patientDocSnap.exists()) {
                 foundRole = 'patient';
                 const appointmentRef = doc(firestore, 'patients', user.uid, 'appointments', callId);
                 appointmentDoc = await getDoc(appointmentRef);
@@ -111,7 +106,7 @@ export default function ConsultationPage({
     
     determineRoleAndGetAppointment();
 
-  }, [user, firestore, callId, doctorDocRef, patientDocRef]);
+  }, [user, firestore, params.id, doctorDocRef, patientDocRef]);
 
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -120,10 +115,10 @@ export default function ConsultationPage({
   // --- Chat Logic ---
   const messagesCollectionRef = useMemoFirebase(
     () =>
-      firestore && callId
-        ? collection(firestore, 'calls', callId, 'messages')
+      firestore && params.id
+        ? collection(firestore, 'calls', params.id, 'messages')
         : null,
-    [firestore, callId]
+    [firestore, params.id]
   );
 
   const messagesQuery = useMemoFirebase(
@@ -164,7 +159,7 @@ export default function ConsultationPage({
     }
   }, [remoteStream, callJoined]);
 
-  const handleJoinCall = async (stream: MediaStream) => {
+  const handleJoinCall = async (stream: MediaStream, callId: string) => {
     setLocalStream(stream);
     setCallJoined(true);
 
@@ -208,8 +203,6 @@ export default function ConsultationPage({
   const endCall = () => {
     localStream?.getTracks().forEach((track) => track.stop());
     remoteStream?.getTracks().forEach((track) => track.stop());
-    // We don't call hangUp() here to allow rejoining.
-    // hangUp(); 
     
     // Role-based redirect
     if (userRole === 'doctor') {
@@ -228,7 +221,7 @@ export default function ConsultationPage({
     return name.substring(0, 2);
   };
   
-  const isLoading = isUserLoading || isPatientLoading || isDoctorLoading || !userRole;
+  const isLoading = isUserLoading || !userRole;
 
   if (isLoading) {
     return <div className="flex h-screen w-full items-center justify-center"><LoadingSpinner /></div>
@@ -237,7 +230,7 @@ export default function ConsultationPage({
   if (!callJoined) {
     return (
       <ConsultationPreview
-        onJoinCall={(stream) => handleJoinCall(stream)}
+        onJoinCall={(stream) => handleJoinCall(stream, params.id)}
         isMicOn={isMicOn}
         isCameraOn={isCameraOn}
         setIsMicOn={setIsMicOn}
