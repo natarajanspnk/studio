@@ -43,7 +43,9 @@ service cloud.firestore {
         allow read, write: if isOwner(patientId);
       }
       match /healthRecords/{healthRecordId} {
-        allow read, write: if isOwner(patientId);
+        // A patient can manage their own records. A doctor can read them.
+        allow read: if isOwner(patientId) || isDoctor();
+        allow write: if isOwner(patientId);
       }
     }
     

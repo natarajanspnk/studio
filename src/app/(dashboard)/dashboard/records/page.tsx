@@ -1,3 +1,6 @@
+
+'use client';
+
 import {
   Table,
   TableBody,
@@ -9,99 +12,94 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileDown, Eye } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { LoadingSpinner } from '@/components/loading-spinner';
+import { WithId } from '@/firebase/firestore/use-collection';
 
-const records = [
-  {
-    id: 1,
-    date: '2024-04-15',
-    doctor: 'Dr. Emily Carter',
-    specialty: 'Cardiologist',
-    diagnosis: 'Hypertension',
-    prescription: 'Lisinopril 10mg',
-  },
-  {
-    id: 2,
-    date: '2024-02-20',
-    doctor: 'Dr. Ben Adams',
-    specialty: 'Dermatologist',
-    diagnosis: 'Acne Vulgaris',
-    prescription: 'Topical Retinoid',
-  },
-  {
-    id: 3,
-    date: '2023-11-10',
-    doctor: 'Dr. Emily Carter',
-    specialty: 'Cardiologist',
-    diagnosis: 'Routine Check-up',
-    prescription: 'N/A',
-  },
-  {
-    id: 4,
-    date: '2023-09-01',
-    doctor: 'Dr. Chloe Davis',
-    specialty: 'Pediatrician',
-    diagnosis: 'Seasonal Allergies',
-    prescription: 'Antihistamine',
-  },
-];
+type Patient = {
+  firstName: string;
+  lastName: string;
+  email: string;
+};
 
 export default function HealthRecordsPage() {
+  const firestore = useFirestore();
+
+  const patientsCollectionRef = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'patients') : null),
+    [firestore]
+  );
+
+  const { data: patients, isLoading } = useCollection<Patient>(patientsCollectionRef);
+
   return (
     <div className="space-y-8">
       <div>
         <h2 className="font-headline text-3xl font-bold tracking-tight">
-          Your Health Records
+          Patient Records
         </h2>
         <p className="mt-2 text-muted-foreground">
-          A comprehensive history of your consultations and medical records.
+          A list of all patients on the platform.
         </p>
       </div>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div>
-            <CardTitle>Consultation History</CardTitle>
+            <CardTitle>All Patients</CardTitle>
             <CardDescription>
-              Click on a record for more details.
+              Select a patient to view their detailed health records.
             </CardDescription>
           </div>
-          <Button variant="outline">
+          <Button variant="outline" disabled>
             <FileDown className="mr-2 h-4 w-4" />
             Export All
           </Button>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Doctor</TableHead>
-                <TableHead>Diagnosis</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell className="font-medium">{record.date}</TableCell>
-                  <TableCell>
-                    <div>{record.doctor}</div>
-                    <div className="text-sm text-muted-foreground">{record.specialty}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{record.diagnosis}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon">
-                      <Eye className="h-4 w-4" />
-                      <span className="sr-only">View Details</span>
-                    </Button>
-                  </TableCell>
+          {isLoading ? (
+            <div className="flex justify-center p-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Patient Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {patients && patients.length > 0 ? (
+                  patients.map((patient) => (
+                    <TableRow key={patient.id}>
+                      <TableCell className="font-medium">
+                        {patient.firstName} {patient.lastName}
+                      </TableCell>
+                      <TableCell>{patient.email}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" disabled>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Records
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="h-24 text-center"
+                    >
+                      No patients found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
