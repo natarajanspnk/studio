@@ -269,11 +269,11 @@ export default function ConsultationPage({
     // Instead we just stop local tracks and navigate away.
     // The call room remains in Firestore.
     
-    if (userRole === 'doctor') {
-      window.location.href = '/dashboard/staff';
-    } else {
-      window.location.href = '/dashboard/consultations';
-    }
+    // if (userRole === 'doctor') {
+    //   window.location.href = '/dashboard/staff';
+    // } else {
+    //   window.location.href = '/dashboard/consultations';
+    // }
   };
 
   // Cleanup on component unmount
