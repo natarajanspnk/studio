@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -56,6 +57,7 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { WithId } from '@/firebase/firestore/use-collection';
 
 export type Doctor = {
+  id: string;
   firstName: string;
   lastName: string;
   specialty: string;
@@ -93,7 +95,7 @@ export default function RosterPage() {
       selectedDoctor?.id || doc(collection(firestore, 'doctors')).id;
     const doctorRef = doc(firestore, 'doctors', doctorId);
 
-    const doctorData: Doctor & { id: string } = {
+    const doctorData: Doctor = {
       ...values,
       id: doctorId,
     };
