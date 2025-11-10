@@ -12,44 +12,54 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileDown, Eye } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import { LoadingSpinner } from '@/components/loading-spinner';
-import { WithId } from '@/firebase/firestore/use-collection';
 
-type Patient = {
-  firstName: string;
-  lastName: string;
-  email: string;
-};
+const placeholderRecords = [
+    {
+        id: '1',
+        patientName: 'Liam Johnson',
+        lastUpdated: '2023-10-25',
+        details: 'Annual Checkup',
+    },
+    {
+        id: '2',
+        patientName: 'Olivia Smith',
+        lastUpdated: '2023-10-22',
+        details: 'Follow-up on seasonal allergies',
+    },
+    {
+        id: '3',
+        patientName: 'Noah Williams',
+        lastUpdated: '2023-09-15',
+        details: 'Prescription Refill',
+    },
+    {
+        id: '4',
+        patientName: 'Emma Brown',
+        lastUpdated: '2023-08-30',
+        details: 'Initial Consultation',
+    },
+];
+
 
 export default function HealthRecordsPage() {
-  const firestore = useFirestore();
-
-  const patientsCollectionRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'patients') : null),
-    [firestore]
-  );
-
-  const { data: patients, isLoading } = useCollection<Patient>(patientsCollectionRef);
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className="font-headline text-3xl font-bold tracking-tight">
-          Patient Records
+          Health Records
         </h2>
         <p className="mt-2 text-muted-foreground">
-          A list of all patients on the platform.
+          View and manage patient health records.
         </p>
       </div>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
           <div>
-            <CardTitle>All Patients</CardTitle>
+            <CardTitle>All Records</CardTitle>
             <CardDescription>
-              Select a patient to view their detailed health records.
+              A list of all patient health records on the platform.
             </CardDescription>
           </div>
           <Button variant="outline" disabled>
@@ -58,50 +68,36 @@ export default function HealthRecordsPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center p-8">
-              <LoadingSpinner />
-            </div>
-          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Patient Name</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Last Updated</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {patients && patients.length > 0 ? (
-                  patients.map((patient) => (
-                    <TableRow key={patient.id}>
+                {placeholderRecords.map((record) => (
+                    <TableRow key={record.id}>
                       <TableCell className="font-medium">
-                        {patient.firstName} {patient.lastName}
+                        {record.patientName}
                       </TableCell>
-                      <TableCell>{patient.email}</TableCell>
+                      <TableCell>{record.lastUpdated}</TableCell>
+                      <TableCell>{record.details}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" disabled>
                           <Eye className="mr-2 h-4 w-4" />
-                          View Records
+                          View Record
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={3}
-                      className="h-24 text-center"
-                    >
-                      No patients found.
-                    </TableCell>
-                  </TableRow>
-                )}
+                  ))}
               </TableBody>
             </Table>
-          )}
         </CardContent>
       </Card>
     </div>
   );
 }
+
