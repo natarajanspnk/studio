@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -37,6 +36,9 @@ export function ConsultationPreview({
   const { toast } = useToast();
 
   useEffect(() => {
+    // This variable will hold the stream for the current execution of this effect.
+    let localStream: MediaStream | null = null;
+    
     const getMedia = async () => {
       setIsLoading(true);
       try {
@@ -44,13 +46,13 @@ export function ConsultationPreview({
           video: true,
           audio: true,
         });
-        streamRef.current = stream;
+        localStream = stream; // Assign to the local variable.
+        streamRef.current = stream; // Also assign to the ref for use outside the effect.
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
         setHasPermission(true);
         
-        // Ensure initial state from parent is respected, but only if stream is active
         if (stream) {
           stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
           stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
@@ -72,11 +74,12 @@ export function ConsultationPreview({
 
     getMedia();
 
+    // The cleanup function now closes over the `localStream` variable.
+    // This ensures it only stops the stream created within this specific effect instance,
+    // preventing the race condition.
     return () => {
-      // This cleanup runs when the component unmounts.
-      // If the user navigates away from the preview without joining, stop the media tracks.
-      if (streamRef.current) {
-         streamRef.current.getTracks().forEach((track) => track.stop());
+      if (localStream) {
+         localStream.getTracks().forEach((track) => track.stop());
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,10 +107,9 @@ export function ConsultationPreview({
 
   const handleJoin = () => {
     if (streamRef.current) {
-      // Pass the active stream to the parent component to use in the call
       onJoinCall(streamRef.current);
-      // Nullify the stream ref here so the cleanup function doesn't stop the tracks,
-      // as they are now being managed by the parent component.
+      // Nullify the ref so the cleanup function in this component instance
+      // doesn't stop the tracks, as they're now managed by the parent.
       streamRef.current = null;
     }
   };
