@@ -26,16 +26,25 @@ type Patient = {
     email: string;
 };
 
+type Appointment = {
+    patientId: string;
+    dateTime: string;
+    doctorName: string;
+    status: string;
+};
+
 interface ExportDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  data: WithId<Patient>[];
+  patients: WithId<Patient>[];
+  appointments: WithId<Appointment>[];
 }
 
 export function ExportDialog({
   isOpen,
   onOpenChange,
-  data,
+  patients,
+  appointments,
 }: ExportDialogProps) {
   const [formatType, setFormatType] = useState<'csv' | 'pdf'>('pdf');
   const [password, setPassword] = useState('');
@@ -79,14 +88,34 @@ export function ExportDialog({
   };
 
   const exportToCsv = () => {
-    const headers = ['Patient ID', 'First Name', 'Last Name', 'Email'];
+    const headers = ['Patient ID', 'First Name', 'Last Name', 'Email', 'Appointment ID', 'Date', 'Doctor', 'Status'];
     
-    const rows = data.map(patient => [
-        patient.id,
-        patient.firstName,
-        patient.lastName,
-        patient.email,
-    ]);
+    const rows: string[][] = [];
+    patients.forEach(patient => {
+        const patientAppointments = appointments.filter(a => a.patientId === patient.id);
+        if (patientAppointments.length > 0) {
+            patientAppointments.forEach(appt => {
+                rows.push([
+                    patient.id,
+                    patient.firstName,
+                    patient.lastName,
+                    patient.email,
+                    appt.id,
+                    format(new Date(appt.dateTime), 'yyyy-MM-dd HH:mm'),
+                    appt.doctorName,
+                    appt.status,
+                ]);
+            });
+        } else {
+             rows.push([
+                patient.id,
+                patient.firstName,
+                patient.lastName,
+                patient.email,
+                'N/A', 'N/A', 'N/A', 'N/A'
+             ]);
+        }
+    });
 
     let csvContent = "data:text/csv;charset=utf-8," 
         + headers.map(h => `"${h}"`).join(",") + "\n" 
@@ -95,7 +124,7 @@ export function ExportDialog({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "patient_records.csv");
+    link.setAttribute("download", "patient_records_with_consultations.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -104,22 +133,42 @@ export function ExportDialog({
   const exportToPdf = () => {
     const doc = new jsPDF();
     
-    doc.text("Patient Records", 14, 15);
+    doc.text("Patient Records and Consultations", 14, 15);
     
-    autoTable(doc, {
-        head: [['ID', 'Name', 'Email']],
-        body: data.map(p => [
-            p.id,
-            `${p.firstName} ${p.lastName}`,
-            p.email,
-        ]),
-        startY: 20,
+    patients.forEach((patient, index) => {
+        if(index > 0) doc.addPage();
+        
+        autoTable(doc, {
+            body: [
+                [{ content: 'Patient Details', colSpan: 2, styles: { fontStyle: 'bold' }}],
+                ['ID', patient.id],
+                ['Name', `${patient.firstName} ${patient.lastName}`],
+                ['Email', patient.email],
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [30, 30, 30] },
+        });
+
+        const patientAppointments = appointments.filter(a => a.patientId === patient.id);
+        if (patientAppointments.length > 0) {
+             autoTable(doc, {
+                head: [['Date', 'Doctor', 'Status']],
+                body: patientAppointments.map(appt => [
+                    format(new Date(appt.dateTime), 'PPP p'),
+                    appt.doctorName,
+                    appt.status,
+                ]),
+                startY: (doc as any).lastAutoTable.finalY + 10,
+                headStyles: { fillColor: [63, 114, 175] }, // primary color
+                foot: [[{ content: 'Consultations', colSpan: 3, styles: { fontStyle: 'bold' } }]],
+            });
+        }
     });
     
     // The userPassword property is not officially in the types, so we cast to any.
     (doc as any).userPassword = password;
     
-    doc.save("patient_records.pdf");
+    doc.save("patient_records_with_consultations.pdf");
   };
 
   return (
