@@ -60,8 +60,8 @@ export default function SignupPage() {
   });
 
   useEffect(() => {
-    const role = form.watch('role');
     if (!isUserLoading && user) {
+        const role = form.getValues('role');
         if(role === 'doctor') {
             router.push('/dashboard/staff');
         } else {
