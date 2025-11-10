@@ -17,13 +17,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { PatientWithAppointments } from './page';
 import { format } from 'date-fns';
+import { WithId } from '@/firebase/firestore/use-collection';
+
+type Patient = {
+    firstName: string;
+    lastName: string;
+    email: string;
+};
 
 interface ExportDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  data: PatientWithAppointments[];
+  data: WithId<Patient>[];
 }
 
 export function ExportDialog({
@@ -73,36 +79,14 @@ export function ExportDialog({
   };
 
   const exportToCsv = () => {
-    const headers = ['Patient ID', 'First Name', 'Last Name', 'Email', 'Date of Birth', 'Phone', 'Address', 'Appointment ID', 'Appointment Date', 'Doctor', 'Specialty', 'Status'];
+    const headers = ['Patient ID', 'First Name', 'Last Name', 'Email'];
     
-    const rows = data.flatMap(patient => {
-        if (patient.appointments.length === 0) {
-            return [[
-                patient.id,
-                patient.firstName,
-                patient.lastName,
-                patient.email,
-                patient.dateOfBirth || '',
-                patient.phone || '',
-                patient.address || '',
-                'N/A', 'N/A', 'N/A', 'N/A', 'N/A'
-            ]];
-        }
-        return patient.appointments.map(appt => [
-            patient.id,
-            patient.firstName,
-            patient.lastName,
-            patient.email,
-            patient.dateOfBirth || '',
-            patient.phone || '',
-            patient.address || '',
-            appt.id,
-            format(new Date(appt.dateTime), 'PPpp'),
-            appt.doctorName,
-            appt.doctorSpecialty,
-            appt.status
-        ]);
-    });
+    const rows = data.map(patient => [
+        patient.id,
+        patient.firstName,
+        patient.lastName,
+        patient.email,
+    ]);
 
     let csvContent = "data:text/csv;charset=utf-8," 
         + headers.map(h => `"${h}"`).join(",") + "\n" 
@@ -111,7 +95,7 @@ export function ExportDialog({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "patient_consultation_records.csv");
+    link.setAttribute("download", "patient_records.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -120,43 +104,22 @@ export function ExportDialog({
   const exportToPdf = () => {
     const doc = new jsPDF();
     
-    doc.text("Patient & Consultation Records", 14, 15);
+    doc.text("Patient Records", 14, 15);
     
     autoTable(doc, {
-        head: [['ID', 'Name', 'Email', 'Date of Birth', 'Total Consultations']],
+        head: [['ID', 'Name', 'Email']],
         body: data.map(p => [
             p.id,
             `${p.firstName} ${p.lastName}`,
             p.email,
-            p.dateOfBirth || 'N/A',
-            p.appointments.length
         ]),
         startY: 20,
-    });
-
-    data.forEach(patient => {
-        if (patient.appointments.length > 0) {
-            autoTable(doc, {
-                head: [['Date & Time', 'Doctor', 'Specialty', 'Status']],
-                body: patient.appointments.map(appt => [
-                    format(new Date(appt.dateTime), 'PPpp'),
-                    appt.doctorName,
-                    appt.doctorSpecialty,
-                    appt.status,
-                ]),
-                startY: (doc as any).lastAutoTable.finalY + 10,
-                didDrawPage: (hookData) => {
-                    // Header for sub-table
-                    doc.text(`Consultations for: ${patient.firstName} ${patient.lastName}`, 14, hookData.cursor?.y ? hookData.cursor.y - 4 : 15);
-                }
-            });
-        }
     });
     
     // The userPassword property is not officially in the types, so we cast to any.
     (doc as any).userPassword = password;
     
-    doc.save("patient_consultation_records.pdf");
+    doc.save("patient_records.pdf");
   };
 
   return (
