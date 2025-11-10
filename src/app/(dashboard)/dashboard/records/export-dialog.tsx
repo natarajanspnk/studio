@@ -17,35 +17,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { WithId } from '@/firebase/firestore/use-collection';
-
-type Patient = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  dateOfBirth?: string;
-  phone?: string;
-  address?: string;
-};
+import { PatientWithAppointments } from './page';
+import { format } from 'date-fns';
 
 interface ExportDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  patients: WithId<Patient>[];
+  data: PatientWithAppointments[];
 }
 
 export function ExportDialog({
   isOpen,
   onOpenChange,
-  patients,
+  data,
 }: ExportDialogProps) {
-  const [format, setFormat] = useState<'csv' | 'pdf'>('pdf');
+  const [formatType, setFormatType] = useState<'csv' | 'pdf'>('pdf');
   const [password, setPassword] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
   const handleExport = async () => {
-    if (format === 'pdf' && !password) {
+    if (formatType === 'pdf' && !password) {
       toast({
         variant: 'destructive',
         title: 'Password Required',
@@ -57,14 +49,14 @@ export function ExportDialog({
     setIsExporting(true);
 
     try {
-      if (format === 'pdf') {
+      if (formatType === 'pdf') {
         exportToPdf();
       } else {
         exportToCsv();
       }
       toast({
         title: 'Export Successful',
-        description: `The patient list has been downloaded as a ${format.toUpperCase()} file.`,
+        description: `The patient records have been downloaded as a ${formatType.toUpperCase()} file.`,
       });
     } catch (error) {
       console.error('Export failed:', error);
@@ -81,25 +73,45 @@ export function ExportDialog({
   };
 
   const exportToCsv = () => {
-    const headers = ['ID', 'First Name', 'Last Name', 'Email', 'Date of Birth', 'Phone', 'Address'];
-    const rows = patients.map(p => [
-        p.id,
-        p.firstName,
-        p.lastName,
-        p.email,
-        p.dateOfBirth || '',
-        p.phone || '',
-        p.address || ''
-    ]);
+    const headers = ['Patient ID', 'First Name', 'Last Name', 'Email', 'Date of Birth', 'Phone', 'Address', 'Appointment ID', 'Appointment Date', 'Doctor', 'Specialty', 'Status'];
+    
+    const rows = data.flatMap(patient => {
+        if (patient.appointments.length === 0) {
+            return [[
+                patient.id,
+                patient.firstName,
+                patient.lastName,
+                patient.email,
+                patient.dateOfBirth || '',
+                patient.phone || '',
+                patient.address || '',
+                'N/A', 'N/A', 'N/A', 'N/A', 'N/A'
+            ]];
+        }
+        return patient.appointments.map(appt => [
+            patient.id,
+            patient.firstName,
+            patient.lastName,
+            patient.email,
+            patient.dateOfBirth || '',
+            patient.phone || '',
+            patient.address || '',
+            appt.id,
+            format(new Date(appt.dateTime), 'PPpp'),
+            appt.doctorName,
+            appt.doctorSpecialty,
+            appt.status
+        ]);
+    });
 
     let csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(",") + "\n" 
-        + rows.map(e => e.join(",")).join("\n");
+        + headers.map(h => `"${h}"`).join(",") + "\n" 
+        + rows.map(e => e.map(cell => `"${cell}"`).join(",")).join("\n");
         
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "patient_records.csv");
+    link.setAttribute("download", "patient_consultation_records.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -108,22 +120,39 @@ export function ExportDialog({
   const exportToPdf = () => {
     const doc = new jsPDF();
     
-    doc.text("Patient Records", 14, 15);
-
+    doc.text("Patient & Consultation Records", 14, 15);
+    
     autoTable(doc, {
-        head: [['ID', 'Name', 'Email', 'Date of Birth']],
-        body: patients.map(p => [
+        head: [['ID', 'Name', 'Email', 'Date of Birth', 'Total Consultations']],
+        body: data.map(p => [
             p.id,
             `${p.firstName} ${p.lastName}`,
             p.email,
-            p.dateOfBirth || 'N/A'
+            p.dateOfBirth || 'N/A',
+            p.appointments.length
         ]),
         startY: 20,
     });
+
+    data.forEach(patient => {
+        if (patient.appointments.length > 0) {
+            autoTable(doc, {
+                head: [['Date & Time', 'Doctor', 'Specialty', 'Status']],
+                body: patient.appointments.map(appt => [
+                    format(new Date(appt.dateTime), 'PPpp'),
+                    appt.doctorName,
+                    appt.doctorSpecialty,
+                    appt.status,
+                ]),
+                startY: (doc as any).lastAutoTable.finalY + 10,
+                didDrawPage: (hookData) => {
+                    // Header for sub-table
+                    doc.text(`Consultations for: ${patient.firstName} ${patient.lastName}`, 14, hookData.cursor?.y ? hookData.cursor.y - 4 : 15);
+                }
+            });
+        }
+    });
     
-    // The jspdf library's password protection is not very strong and can be bypassed.
-    // For a real-world application, encryption should be handled server-side before download.
-    // This implementation is for demonstration purposes.
     doc.output('dataurlnewwindow', {
         // @ts-ignore - jspdf types are incorrect for userPassword
         userPassword: password,
@@ -143,8 +172,8 @@ export function ExportDialog({
           <div className="space-y-2">
             <Label>Format</Label>
             <RadioGroup
-              value={format}
-              onValueChange={(value: 'csv' | 'pdf') => setFormat(value)}
+              value={formatType}
+              onValueChange={(value: 'csv' | 'pdf') => setFormatType(value)}
               className="flex gap-4"
             >
               <div className="flex items-center space-x-2">
@@ -157,7 +186,7 @@ export function ExportDialog({
               </div>
             </RadioGroup>
           </div>
-          {format === 'pdf' && (
+          {formatType === 'pdf' && (
             <div className="space-y-2">
               <Label htmlFor="password">PDF Password</Label>
               <Input
@@ -176,7 +205,7 @@ export function ExportDialog({
         <DialogFooter>
           <Button
             onClick={handleExport}
-            disabled={isExporting || (format === 'pdf' && !password)}
+            disabled={isExporting || (formatType === 'pdf' && !password)}
           >
             {isExporting ? 'Exporting...' : 'Export Data'}
           </Button>
@@ -185,4 +214,3 @@ export function ExportDialog({
     </Dialog>
   );
 }
-

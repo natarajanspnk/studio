@@ -14,10 +14,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { FileDown, Eye } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, collectionGroup, doc } from 'firebase/firestore';
 import { WithId } from '@/firebase/firestore/use-collection';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { ExportDialog } from './export-dialog';
+import type { Appointment } from '@/lib/types';
+import { format } from 'date-fns';
 
 type Patient = {
   firstName: string;
@@ -28,8 +30,8 @@ type Patient = {
   address?: string;
 };
 
-type HealthRecord = {
-  lastUpdatedDate?: string;
+export type PatientWithAppointments = WithId<Patient> & {
+  appointments: WithId<Appointment>[];
 };
 
 export default function HealthRecordsPage() {
@@ -45,20 +47,35 @@ export default function HealthRecordsPage() {
   const { data: patients, isLoading: isPatientsLoading } =
     useCollection<Patient>(patientsCollectionRef);
 
-  // This is a simplified example. In a real app, you would likely fetch the health record
-  // for each patient or have the lastUpdatedDate denormalized on the patient object.
-  // For now, we'll just simulate fetching one record to show the concept.
-  const firstPatientHealthRecordRef = useMemoFirebase(
-    () =>
-      firestore && patients && patients.length > 0
-        ? collection(firestore, 'patients', patients[0].id, 'healthRecords')
-        : null,
-    [firestore, patients]
-  );
-  const { data: healthRecords, isLoading: isRecordsLoading } =
-    useCollection<HealthRecord>(firstPatientHealthRecordRef);
+  // Fetch all appointments across all patients
+  const allAppointmentsQuery = useMemoFirebase(
+      () => (firestore ? collectionGroup(firestore, 'appointments') : null),
+      [firestore]
+  )
+  const { data: allAppointments, isLoading: isAppointmentsLoading } = useCollection<Appointment>(allAppointmentsQuery);
 
-  const isLoading = isPatientsLoading || (patients && patients.length > 0 && isRecordsLoading);
+
+  // Combine patients and their appointments
+  const patientsWithAppointments: PatientWithAppointments[] = useMemo(() => {
+    if (!patients || !allAppointments) return [];
+    
+    const appointmentsMap = new Map<string, WithId<Appointment>[]>();
+    allAppointments.forEach(appt => {
+        if (!appointmentsMap.has(appt.patientId)) {
+            appointmentsMap.set(appt.patientId, []);
+        }
+        appointmentsMap.get(appt.patientId)!.push(appt);
+    });
+
+    return patients.map(patient => ({
+      ...patient,
+      appointments: appointmentsMap.get(patient.id) || [],
+    }));
+
+  }, [patients, allAppointments]);
+
+
+  const isLoading = isPatientsLoading || isAppointmentsLoading;
   
   return (
     <div className="space-y-8">
@@ -82,7 +99,7 @@ export default function HealthRecordsPage() {
           <Button
             variant="outline"
             onClick={() => setIsExportDialogOpen(true)}
-            disabled={!patients || patients.length === 0}
+            disabled={!patientsWithAppointments || patientsWithAppointments.length === 0}
           >
             <FileDown className="mr-2 h-4 w-4" />
             Export All
@@ -98,26 +115,24 @@ export default function HealthRecordsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Patient Name</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead>Details</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Consultations</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {patients && patients.length > 0 ? (
-                  patients.map((record, index) => (
+                {patientsWithAppointments && patientsWithAppointments.length > 0 ? (
+                  patientsWithAppointments.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">
                         {record.firstName} {record.lastName}
                       </TableCell>
-                      <TableCell>
-                        {index === 0 && healthRecords && healthRecords.length > 0
-                          ? new Date(
-                              healthRecords[0].lastUpdatedDate!
-                            ).toLocaleDateString()
-                          : new Date().toLocaleDateString() /* Fallback */}
+                       <TableCell>
+                        {record.email}
                       </TableCell>
-                      <TableCell>Follow-up required</TableCell>
+                      <TableCell>
+                        {record.appointments.length}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" disabled>
                           <Eye className="mr-2 h-4 w-4" />
@@ -142,7 +157,7 @@ export default function HealthRecordsPage() {
       <ExportDialog
         isOpen={isExportDialogOpen}
         onOpenChange={setIsExportDialogOpen}
-        patients={patients || []}
+        data={patientsWithAppointments || []}
       />
     </div>
   );
