@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -12,36 +13,24 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileDown, Eye } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { WithId } from '@/firebase/firestore/use-collection';
+import { LoadingSpinner } from '@/components/loading-spinner';
 
-const placeholderRecords = [
-    {
-        id: '1',
-        patientName: 'Liam Johnson',
-        lastUpdated: '2023-10-25',
-        details: 'Annual Checkup',
-    },
-    {
-        id: '2',
-        patientName: 'Olivia Smith',
-        lastUpdated: '2023-10-22',
-        details: 'Follow-up on seasonal allergies',
-    },
-    {
-        id: '3',
-        patientName: 'Noah Williams',
-        lastUpdated: '2023-09-15',
-        details: 'Prescription Refill',
-    },
-    {
-        id: '4',
-        patientName: 'Emma Brown',
-        lastUpdated: '2023-08-30',
-        details: 'Initial Consultation',
-    },
-];
-
+type Patient = {
+  firstName: string;
+  lastName: string;
+  email: string;
+};
 
 export default function HealthRecordsPage() {
+  const firestore = useFirestore();
+  const patientsCollectionRef = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'patients') : null),
+    [firestore]
+  );
+  const { data: patients, isLoading } = useCollection<Patient>(patientsCollectionRef);
 
   return (
     <div className="space-y-8">
@@ -68,6 +57,11 @@ export default function HealthRecordsPage() {
           </Button>
         </CardHeader>
         <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <LoadingSpinner />
+            </div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -78,13 +72,18 @@ export default function HealthRecordsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {placeholderRecords.map((record) => (
+                {patients && patients.length > 0 ? (
+                  patients.map((record) => (
                     <TableRow key={record.id}>
                       <TableCell className="font-medium">
-                        {record.patientName}
+                        {record.firstName} {record.lastName}
                       </TableCell>
-                      <TableCell>{record.lastUpdated}</TableCell>
-                      <TableCell>{record.details}</TableCell>
+                      <TableCell>
+                        {new Date().toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        Follow-up required
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" disabled>
                           <Eye className="mr-2 h-4 w-4" />
@@ -92,12 +91,19 @@ export default function HealthRecordsPage() {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      No patient records found.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
-
