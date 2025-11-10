@@ -13,13 +13,12 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileDown, Eye } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, collectionGroup, doc } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, collectionGroup } from 'firebase/firestore';
 import { WithId } from '@/firebase/firestore/use-collection';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { ExportDialog } from './export-dialog';
 import type { Appointment } from '@/lib/types';
-import { format } from 'date-fns';
 
 type Patient = {
   firstName: string;
@@ -36,7 +35,6 @@ export type PatientWithAppointments = WithId<Patient> & {
 
 export default function HealthRecordsPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   // Fetch all patients
@@ -99,7 +97,7 @@ export default function HealthRecordsPage() {
           <Button
             variant="outline"
             onClick={() => setIsExportDialogOpen(true)}
-            disabled={!patientsWithAppointments || patientsWithAppointments.length === 0}
+            disabled={isLoading || !patientsWithAppointments || patientsWithAppointments.length === 0}
           >
             <FileDown className="mr-2 h-4 w-4" />
             Export All

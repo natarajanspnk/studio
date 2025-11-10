@@ -106,7 +106,7 @@ export function ExportDialog({
 
     let csvContent = "data:text/csv;charset=utf-8," 
         + headers.map(h => `"${h}"`).join(",") + "\n" 
-        + rows.map(e => e.map(cell => `"${cell}"`).join(",")).join("\n");
+        + rows.map(e => e.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(",")).join("\n");
         
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -153,10 +153,10 @@ export function ExportDialog({
         }
     });
     
-    doc.output('dataurlnewwindow', {
-        // @ts-ignore - jspdf types are incorrect for userPassword
-        userPassword: password,
-    });
+    // The userPassword property is not officially in the types, so we cast to any.
+    (doc as any).userPassword = password;
+    
+    doc.save("patient_consultation_records.pdf");
   };
 
   return (
