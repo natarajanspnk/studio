@@ -34,8 +34,8 @@ service cloud.firestore {
 
     // Patients Collection: Allow doctors to list/read, but only the owner to write.
     match /patients/{patientId} {
-      allow list: if isDoctor();
-      allow read: if isOwner(patientId) || isDoctor();
+      allow list, read: if isDoctor();
+      allow get: if isOwner(patientId) || isDoctor();
       allow write: if isOwner(patientId);
 
       // Subcollections for patients
