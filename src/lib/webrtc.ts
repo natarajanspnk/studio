@@ -9,8 +9,6 @@ import {
   onSnapshot,
   setDoc,
   updateDoc,
-  Unsubscribe,
-  DocumentReference,
 } from 'firebase/firestore';
 
 const servers = {
@@ -22,32 +20,23 @@ const servers = {
   iceCandidatePoolSize: 10,
 };
 
-export const createPeerConnection = (
-  onTrack: (event: RTCTrackEvent) => void
-): RTCPeerConnection => {
-  const pc = new RTCPeerConnection(servers);
-  pc.ontrack = onTrack;
-  return pc;
-};
-
 export const startCall = async (
   peerConnection: RTCPeerConnection,
   firestore: Firestore,
   callId: string,
-  localStream: MediaStream,
-  onIceCandidate: (candidate: RTCIceCandidate) => void
+  localStream: MediaStream
 ): Promise<() => void> => {
-
   const callDocRef = doc(firestore, 'calls', callId);
+  const offerCandidatesCollection = collection(firestore, 'calls', callId, 'offerCandidates');
   const answerCandidatesCollection = collection(firestore, 'calls', callId, 'answerCandidates');
 
   localStream.getTracks().forEach((track) => {
     peerConnection.addTrack(track, localStream);
   });
-  
+
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      onIceCandidate(event.candidate);
+      addDoc(offerCandidatesCollection, event.candidate.toJSON());
     }
   };
 
@@ -88,34 +77,43 @@ export const joinCall = async (
   peerConnection: RTCPeerConnection,
   firestore: Firestore,
   callId: string,
-  localStream: MediaStream,
-  onIceCandidate: (candidate: RTCIceCandidate) => void
+  localStream: MediaStream
 ): Promise<() => void> => {
-
   const callDocRef = doc(firestore, 'calls', callId);
   const offerCandidatesCollection = collection(firestore, 'calls', callId, 'offerCandidates');
-  
+  const answerCandidatesCollection = collection(firestore, 'calls', callId, 'answerCandidates');
+
   const callDoc = await getDoc(callDocRef);
 
   if (!callDoc.exists()) {
     throw new Error("Call doesn't exist!");
   }
 
+  // Queue for candidates
+  const candidateQueue: RTCIceCandidateInit[] = [];
+
   localStream.getTracks().forEach((track) => {
     peerConnection.addTrack(track, localStream);
   });
-  
+
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      onIceCandidate(event.candidate);
+      addDoc(answerCandidatesCollection, event.candidate.toJSON());
     }
   };
-
+  
+  // Set the remote description
   const offerDescription = callDoc.data().offer;
   await peerConnection.setRemoteDescription(
     new RTCSessionDescription(offerDescription)
   );
+  
+  // Now that the remote description is set, process any queued candidates
+  candidateQueue.forEach(candidate => {
+    peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+  });
 
+  // Create and set answer
   const answerDescription = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answerDescription);
 
@@ -126,16 +124,22 @@ export const joinCall = async (
 
   await updateDoc(callDocRef, { answer });
 
+  // Listen for candidates
   const unsubscribeCandidates = onSnapshot(offerCandidatesCollection, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
-        let data = change.doc.data();
-        peerConnection.addIceCandidate(new RTCIceCandidate(data));
+        const candidate = change.doc.data() as RTCIceCandidateInit;
+        if (peerConnection.currentRemoteDescription) {
+          peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } else {
+          // If remote description is not set yet, queue the candidate
+          candidateQueue.push(candidate);
+        }
       }
     });
   });
 
   return () => {
     unsubscribeCandidates();
-  }
+  };
 };

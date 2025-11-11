@@ -232,16 +232,11 @@ export default function ConsultationPage({
     if (!callDocRef) return;
     const callDoc = await getDoc(callDocRef);
     
-    const onIceCandidate = (candidate: RTCIceCandidate) => {
-        const candidatesCollection = collection(firestore, 'calls', callId, userRole === 'doctor' ? 'answerCandidates' : 'offerCandidates');
-        addDoc(candidatesCollection, candidate.toJSON());
-    }
-
     if (callDoc.exists() && callDoc.data().offer && userRole === 'doctor') {
-      const cleanup = await joinCall(peerConnectionRef.current, firestore, callId, stream, onIceCandidate);
+      const cleanup = await joinCall(peerConnectionRef.current, firestore, callId, stream);
       unsubscribeListenersRef.current.push(cleanup);
     } else {
-      const cleanup = await startCall(peerConnectionRef.current, firestore, callId, stream, onIceCandidate);
+      const cleanup = await startCall(peerConnectionRef.current, firestore, callId, stream);
       unsubscribeListenersRef.current.push(cleanup);
     }
   };
@@ -554,7 +549,3 @@ export default function ConsultationPage({
     </div>
   );
 }
-
-    
-
-    
