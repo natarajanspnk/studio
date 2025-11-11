@@ -53,9 +53,6 @@ export function ConsultationPreview({
         // Apply initial mic/camera state that might have been set before permissions
         stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
         stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
-        setIsCameraOn(isCameraOn); // Force re-render with correct state
-        setIsMicOn(isMicOn);
-
 
       } catch (error) {
         console.error('Error accessing media devices.', error);
@@ -80,7 +77,7 @@ export function ConsultationPreview({
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isMicOn, isCameraOn]);
 
   const toggleMic = () => {
     if (streamRef.current) {
