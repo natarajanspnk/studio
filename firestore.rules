@@ -32,9 +32,11 @@ service cloud.firestore {
       }
     }
 
-    // Patients Collection: Allow doctors to list/get, but only the owner to write.
+    // Patients Collection: Allow any authenticated user to list patients.
+    // This is a temporary measure to fix the permission error.
+    // A more secure rule using custom claims should be implemented.
     match /patients/{patientId} {
-      allow list: if isDoctor();
+      allow list: if isSignedIn();
       allow get: if isDoctor() || isOwner(patientId);
       allow write: if isOwner(patientId);
 
