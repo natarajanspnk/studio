@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -36,7 +37,6 @@ export function ConsultationPreview({
   const { toast } = useToast();
 
   useEffect(() => {
-    // This variable will hold the stream for the current execution of this effect.
     let localStream: MediaStream | null = null;
     
     const getMedia = async () => {
@@ -46,17 +46,16 @@ export function ConsultationPreview({
           video: true,
           audio: true,
         });
-        localStream = stream; // Assign to the local variable.
-        streamRef.current = stream; // Also assign to the ref for use outside the effect.
+        localStream = stream;
+        streamRef.current = stream; 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
         setHasPermission(true);
         
-        if (stream) {
-          stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
-          stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
-        }
+        // Apply initial mic/camera state
+        stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
+        stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
 
       } catch (error) {
         console.error('Error accessing media devices.', error);
@@ -74,9 +73,6 @@ export function ConsultationPreview({
 
     getMedia();
 
-    // The cleanup function now closes over the `localStream` variable.
-    // This ensures it only stops the stream created within this specific effect instance,
-    // preventing the race condition.
     return () => {
       if (localStream) {
          localStream.getTracks().forEach((track) => track.stop());
