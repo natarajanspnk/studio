@@ -262,18 +262,17 @@ export default function ConsultationPage({
     localStream?.getTracks().forEach((track) => track.stop());
     setLocalStream(null);
     setRemoteStream(null);
-    setCallJoined(false);
-    setResetKey(prev => prev + 1); // Force remount of preview
-
-    // We don't hangUp() here to allow rejoining.
-    // Instead we just stop local tracks and navigate away.
-    // The call room remains in Firestore.
     
-    // if (userRole === 'doctor') {
-    //   window.location.href = '/dashboard/staff';
-    // } else {
-    //   window.location.href = '/dashboard/consultations';
-    // }
+    hangUp();
+    
+    setCallJoined(false);
+    setResetKey(prev => prev + 1);
+
+    if (userRole === 'doctor') {
+      window.location.href = '/dashboard/staff';
+    } else {
+      window.location.href = '/dashboard/consultations';
+    }
   };
 
   // Cleanup on component unmount
