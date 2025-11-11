@@ -30,15 +30,13 @@ export function ConsultationPreview({
   setIsMicOn,
   setIsCameraOn,
 }: ConsultationPreviewProps) {
-  const [hasPermission, setHasPermission] = useState(false);
+  const [hasPermission, setHasPermission] = useState(true); // Assume true initially
   const [isLoading, setIsLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    let localStream: MediaStream | null = null;
-    
     const getMedia = async () => {
       setIsLoading(true);
       try {
@@ -46,16 +44,18 @@ export function ConsultationPreview({
           video: true,
           audio: true,
         });
-        localStream = stream;
         streamRef.current = stream; 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
         setHasPermission(true);
         
-        // Apply initial mic/camera state
+        // Apply initial mic/camera state that might have been set before permissions
         stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
         stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
+        setIsCameraOn(isCameraOn); // Force re-render with correct state
+        setIsMicOn(isMicOn);
+
 
       } catch (error) {
         console.error('Error accessing media devices.', error);
@@ -74,8 +74,9 @@ export function ConsultationPreview({
     getMedia();
 
     return () => {
-      if (localStream) {
-         localStream.getTracks().forEach((track) => track.stop());
+      // Only stop the stream if it's not being passed to the parent
+      if (streamRef.current) {
+         streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -116,30 +117,30 @@ export function ConsultationPreview({
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-muted">
             {isLoading && (
-              <div className="flex flex-col items-center gap-2">
+              <div className="absolute z-10 flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 animate-spin" />
                 <p>Starting camera...</p>
               </div>
             )}
             <video
               ref={videoRef}
-              className={`h-full w-full object-cover ${!isLoading && hasPermission ? 'block' : 'hidden'} -scale-x-100`}
+              className="h-full w-full -scale-x-100 object-cover"
               autoPlay
               muted
               playsInline
             />
-             {!isLoading && !hasPermission && (
+             {!hasPermission && !isLoading && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 p-4 text-center">
                  <Alert variant="destructive" className="max-w-sm border-0">
                   <VideoOff className="h-4 w-4" />
                    <AlertTitle>Camera & Mic Required</AlertTitle>
                    <AlertDescription>
-                     Please grant permission to use your camera and microphone to continue. You may need to refresh.
+                     Please grant permission to use your camera and microphone. You may need to refresh the page.
                    </AlertDescription>
                  </Alert>
                </div>
             )}
-            {!isLoading && hasPermission && !isCameraOn && (
+            {hasPermission && !isCameraOn && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4">
                   <VideoOff className="h-16 w-16 text-white/70" />
                   <p className="mt-2 text-white/70">Your camera is off</p>
