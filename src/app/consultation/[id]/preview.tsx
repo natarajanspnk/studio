@@ -71,13 +71,13 @@ export function ConsultationPreview({
     getMedia();
 
     return () => {
-      // Only stop the stream if it's not being passed to the parent
+      // Only stop the stream if it's still active and hasn't been passed to the parent.
       if (streamRef.current) {
          streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMicOn, isCameraOn]);
+  }, []);
 
   const toggleMic = () => {
     if (streamRef.current) {
