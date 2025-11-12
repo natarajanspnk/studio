@@ -68,7 +68,7 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
-  const { id: callId } = params;
+  const { id: callId } = use(params);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -552,5 +552,3 @@ export default function ConsultationPage({
     </div>
   );
 }
-
-    
