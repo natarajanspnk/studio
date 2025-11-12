@@ -44,6 +44,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 type Message = {
   text: string;
@@ -67,10 +68,11 @@ export default function ConsultationPage({
 }: {
   params: { id: string };
 }) {
-  const { id: callId } = use(params);
+  const { id: callId } = params;
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -222,9 +224,10 @@ export default function ConsultationPage({
     // Clean up previous listeners
     hangUp();
 
-    peerConnectionRef.current = new RTCPeerConnection(undefined);
+    const peerConnection = new RTCPeerConnection(servers);
+    peerConnectionRef.current = peerConnection;
     
-    peerConnectionRef.current.ontrack = (event) => {
+    peerConnection.ontrack = (event) => {
         const newRemoteStream = event.streams[0];
         setRemoteStream(newRemoteStream);
     };
@@ -232,13 +235,13 @@ export default function ConsultationPage({
     if (!callDocRef) return;
     const callDoc = await getDoc(callDocRef);
     
+    let cleanup;
     if (callDoc.exists() && callDoc.data().offer && userRole === 'doctor') {
-      const cleanup = await joinCall(peerConnectionRef.current, firestore, callId, stream);
-      unsubscribeListenersRef.current.push(cleanup);
+      cleanup = await joinCall(peerConnection, firestore, callId, stream);
     } else {
-      const cleanup = await startCall(peerConnectionRef.current, firestore, callId, stream);
-      unsubscribeListenersRef.current.push(cleanup);
+      cleanup = await startCall(peerConnection, firestore, callId, stream);
     }
+    unsubscribeListenersRef.current.push(cleanup);
   };
 
   const hangUp = () => {
@@ -264,9 +267,9 @@ export default function ConsultationPage({
     setResetKey(prev => prev + 1);
 
     if (userRole === 'doctor') {
-      window.location.href = '/dashboard/staff';
+      router.push('/dashboard/staff');
     } else {
-      window.location.href = '/dashboard/consultations';
+      router.push('/dashboard/consultations');
     }
   };
 
@@ -549,3 +552,5 @@ export default function ConsultationPage({
     </div>
   );
 }
+
+    
