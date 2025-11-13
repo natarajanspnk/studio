@@ -1,6 +1,6 @@
 
 'use client';
-
+//export const dynamic = 'force-dynamic';
 import { useEffect, useRef, useState, useMemo, use } from 'react';
 import {
   Mic,
