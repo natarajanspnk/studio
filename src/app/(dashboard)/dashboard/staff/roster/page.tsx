@@ -167,50 +167,6 @@ export default function RosterPage() {
     setDialogOpen(true);
   };
   
-  const ActionMenuItem = ({
-    doctor,
-    action,
-   }: {
-    doctor: WithId<Doctor>;
-    action: 'edit' | 'delete';
-   }) => {
-    const isOwner = user?.uid === doctor.id;
-  
-    const content =
-      action === 'edit' ? (
-        <DropdownMenuItem
-          onSelect={(e) => e.preventDefault()}
-          onClick={() => openEditDialog(doctor)}
-          disabled={!isOwner}
-        >
-          Edit
-        </DropdownMenuItem>
-      ) : (
-        <DropdownMenuItem
-          onSelect={(e) => e.preventDefault()}
-          className="text-destructive"
-          onClick={() => openDeleteDialog(doctor)}
-          disabled={!isOwner}
-        >
-          Delete
-        </DropdownMenuItem>
-      );
-  
-    if (isOwner) {
-      return content;
-    }
-  
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{content}</TooltipTrigger>
-        <TooltipContent side="left">
-          <p>You can only manage your own profile.</p>
-        </TooltipContent>
-      </Tooltip>
-    );
-   };
-
-
   return (
     <Dialog
       open={dialogOpen}
@@ -259,43 +215,65 @@ export default function RosterPage() {
               <TableBody>
                 {doctors &&
                   doctors.map((doctor) => (
-                    <TableRow key={doctor.id}>
-                      <TableCell className="font-medium">
-                        Dr. {doctor.firstName} {doctor.lastName}
-                      </TableCell>
-                      <TableCell>{doctor.specialty}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            doctor.isAvailable ? 'default' : 'secondary'
-                          }
-                          className={doctor.isAvailable ? 'bg-green-500' : ''}
-                        >
-                          {doctor.isAvailable ? 'Available' : 'Unavailable'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div>{doctor.email}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {doctor.phone}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <ActionMenuItem doctor={doctor} action="edit" />
-                              <ActionMenuItem doctor={doctor} action="delete" />
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                    <TooltipProvider key={doctor.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              Dr. {doctor.firstName} {doctor.lastName}
+                            </TableCell>
+                            <TableCell>{doctor.specialty}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  doctor.isAvailable ? 'default' : 'secondary'
+                                }
+                                className={doctor.isAvailable ? 'bg-green-500' : ''}
+                              >
+                                {doctor.isAvailable ? 'Available' : 'Unavailable'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div>{doctor.email}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {doctor.phone}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Actions</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                    onClick={() => openEditDialog(doctor)}
+                                    disabled={user?.uid !== doctor.id}
+                                  >
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="text-destructive"
+                                    onClick={() => openDeleteDialog(doctor)}
+                                    disabled={user?.uid !== doctor.id}
+                                  >
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{doctor.address}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   ))}
                 {(!doctors || doctors.length === 0) && (
                   <TableRow>
