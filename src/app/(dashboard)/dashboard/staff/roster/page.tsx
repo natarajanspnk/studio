@@ -91,6 +91,16 @@ export default function RosterPage() {
   const handleFormSubmit = (values: DoctorFormValues) => {
     if (!firestore) return;
 
+    // A user can only submit a form for themselves
+    if (selectedDoctor && user?.uid !== selectedDoctor.id) {
+        toast({
+            variant: 'destructive',
+            title: 'Permission Denied',
+            description: 'You can only edit your own profile.',
+        });
+        return;
+    }
+
     const doctorId =
       selectedDoctor?.id || doc(collection(firestore, 'doctors')).id;
     const doctorRef = doc(firestore, 'doctors', doctorId);
@@ -123,17 +133,17 @@ export default function RosterPage() {
 
   const handleDeleteDoctor = () => {
     if (!firestore || !selectedDoctor) return;
-
-    if (user?.uid === selectedDoctor.id) {
+    
+    if (user?.uid !== selectedDoctor.id) {
       toast({
         variant: 'destructive',
-        title: 'Action Not Allowed',
-        description:
-          'You cannot delete your own account from the doctor roster.',
+        title: 'Permission Denied',
+        description: 'You can only delete your own profile.',
       });
       setDeleteConfirmOpen(false);
       return;
     }
+
 
     const doctorRef = doc(firestore, 'doctors', selectedDoctor.id);
     deleteDocumentNonBlocking(doctorRef);
@@ -233,13 +243,14 @@ export default function RosterPage() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem
                               onClick={() => openEditDialog(doctor)}
+                              disabled={user?.uid !== doctor.id}
                             >
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => openDeleteDialog(doctor)}
-                              disabled={user?.uid === doctor.id}
+                              disabled={user?.uid !== doctor.id}
                             >
                               Delete
                             </DropdownMenuItem>
