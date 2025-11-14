@@ -95,10 +95,10 @@ export default function RosterPage() {
   } = useCollection<Doctor>(doctorsCollectionRef);
 
   const handleFormSubmit = (values: DoctorFormValues) => {
-    if (!firestore) return;
+    if (!firestore || !selectedDoctor) return;
 
     // A user can only submit a form for themselves
-    if (selectedDoctor && user?.uid !== selectedDoctor.id) {
+    if (user?.uid !== selectedDoctor.id) {
       toast({
         variant: 'destructive',
         title: 'Permission Denied',
@@ -107,8 +107,7 @@ export default function RosterPage() {
       return;
     }
 
-    const doctorId =
-      selectedDoctor?.id || doc(collection(firestore, 'doctors')).id;
+    const doctorId = selectedDoctor.id;
     const doctorRef = doc(firestore, 'doctors', doctorId);
 
     const doctorData: Doctor = {
@@ -119,20 +118,58 @@ export default function RosterPage() {
     setDocumentNonBlocking(doctorRef, doctorData, { merge: true });
 
     toast({
-      title: selectedDoctor ? 'Doctor Updated' : 'Doctor Added',
+      title: 'Doctor Updated',
       description: `Dr. ${values.firstName} ${values.lastName} has been successfully saved.`,
     });
 
     setDialogOpen(false);
     setSelectedDoctor(null);
   };
+  
+  const handleAddDoctor = (values: DoctorFormValues) => {
+    if (!firestore) return;
+    
+    const doctorId = doc(collection(firestore, 'doctors')).id;
+    const doctorRef = doc(firestore, 'doctors', doctorId);
+    
+    const doctorData: Doctor = {
+        ...values,
+        id: doctorId,
+    };
+    
+    setDocumentNonBlocking(doctorRef, doctorData, { merge: true });
+
+    toast({
+      title: 'Doctor Added',
+      description: `Dr. ${values.firstName} ${values.lastName} has been successfully saved.`,
+    });
+    
+    setDialogOpen(false);
+    setSelectedDoctor(null);
+  }
 
   const openEditDialog = (doctor: WithId<Doctor>) => {
+     if (user?.uid !== doctor.id) {
+        toast({
+            variant: 'destructive',
+            title: 'Permission Denied',
+            description: 'You can only manage your own profile.',
+        });
+        return;
+    }
     setSelectedDoctor(doctor);
     setDialogOpen(true);
   };
 
   const openDeleteDialog = (doctor: WithId<Doctor>) => {
+    if (user?.uid !== doctor.id) {
+        toast({
+            variant: 'destructive',
+            title: 'Permission Denied',
+            description: 'You can only manage your own profile.',
+        });
+        return;
+    }
     setSelectedDoctor(doctor);
     setDeleteConfirmOpen(true);
   };
@@ -183,12 +220,7 @@ export default function RosterPage() {
               Manage the list of all doctors on the platform.
             </CardDescription>
           </div>
-          <DialogTrigger asChild>
-            <Button onClick={openAddDialog}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Doctor
-            </Button>
-          </DialogTrigger>
+          {/* We trigger the add dialog separately */}
         </CardHeader>
         <CardContent>
           {isDoctorsLoading && (
@@ -250,17 +282,19 @@ export default function RosterPage() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                   <DropdownMenuItem
-                                    onSelect={(e) => e.preventDefault()}
-                                    onClick={() => openEditDialog(doctor)}
-                                    disabled={user?.uid !== doctor.id}
+                                    onSelect={(e) => {
+                                        e.preventDefault();
+                                        openEditDialog(doctor);
+                                    }}
                                   >
                                     Edit
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
-                                    onSelect={(e) => e.preventDefault()}
+                                    onSelect={(e) => {
+                                        e.preventDefault();
+                                        openDeleteDialog(doctor);
+                                    }}
                                     className="text-destructive"
-                                    onClick={() => openDeleteDialog(doctor)}
-                                    disabled={user?.uid !== doctor.id}
                                   >
                                     Delete
                                   </DropdownMenuItem>
@@ -297,7 +331,7 @@ export default function RosterPage() {
           </DialogTitle>
         </DialogHeader>
         <DoctorForm
-          onSubmit={handleFormSubmit}
+          onSubmit={selectedDoctor ? handleFormSubmit : handleAddDoctor}
           defaultValues={selectedDoctor}
         />
       </DialogContent>
