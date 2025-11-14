@@ -18,7 +18,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 const features = [
   {
     icon: <HeartPulse className="h-8 w-8 text-primary" />,
-    title: 'Online ',
+    title: 'Online Appointment Booking',
     description:
       'Easily schedule appointments with our specialists through an intuitive online calendar system.',
   },
