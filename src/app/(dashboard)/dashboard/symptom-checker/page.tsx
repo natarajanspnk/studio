@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { SymptomCheckerForm } from '@/components/symptom-checker-form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Lightbulb } from 'lucide-react';
