@@ -60,8 +60,8 @@ export default function SignupPage() {
   });
 
   useEffect(() => {
-    const role = form.watch('role');
     if (!isUserLoading && user) {
+        const role = form.getValues('role');
         if(role === 'doctor') {
             router.push('/dashboard/staff');
         } else {
@@ -71,17 +71,22 @@ export default function SignupPage() {
   }, [user, isUserLoading, router, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    try {
-      initiateEmailSignUp(auth, values.email, values.password);
-      // After sign-up, the onAuthStateChanged listener will catch the new user.
-      // We can listen for the user object to be populated and then update the profile.
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Sign-up Failed',
-        description: error.message || 'An unexpected error occurred.',
-      });
-    }
+    initiateEmailSignUp(auth, values.email, values.password, (error: any) => {
+      if (error.code === 'auth/email-already-in-use') {
+        toast({
+          variant: 'destructive',
+          title: 'Sign-up Failed',
+          description:
+            'This email address is already in use. Please try another one.',
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Sign-up Failed',
+          description: error.message || 'An unexpected error occurred.',
+        });
+      }
+    });
   }
 
   useEffect(() => {

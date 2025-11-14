@@ -18,10 +18,10 @@ service cloud.firestore {
     }
 
     // Doctors Collection: Allow any signed-in user to read/list.
-    // Allow any user who is a doctor to write to any doctor document.
+    // Allow a user to create or update their own doctor document.
     match /doctors/{doctorId} {
       allow read: if isSignedIn();
-      allow write: if isDoctor();
+      allow write: if isOwner(doctorId);
 
       // Appointments subcollection for doctors
       // Allow any signed-in user to write an appointment for a doctor.
@@ -32,10 +32,12 @@ service cloud.firestore {
       }
     }
 
-    // Patients Collection: Allow doctors to list/read, but only the owner to write.
+    // Patients Collection: Allow any authenticated user to list patients.
+    // This is a temporary measure to fix the permission error.
+    // A more secure rule using custom claims should be implemented.
     match /patients/{patientId} {
-      allow list: if isDoctor();
-      allow read: if isOwner(patientId) || isDoctor();
+      allow list: if isSignedIn();
+      allow get: if isDoctor() || isOwner(patientId);
       allow write: if isOwner(patientId);
 
       // Subcollections for patients
@@ -43,7 +45,9 @@ service cloud.firestore {
         allow read, write: if isOwner(patientId);
       }
       match /healthRecords/{healthRecordId} {
-        allow read, write: if isOwner(patientId);
+        // A patient can manage their own records. A doctor can read them.
+        allow read: if isOwner(patientId) || isDoctor();
+        allow write: if isOwner(patientId);
       }
     }
     

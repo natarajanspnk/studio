@@ -44,6 +44,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 type Message = {
   text: string;
@@ -62,6 +63,16 @@ type CallData = {
     doctorName?: string;
 }
 
+const servers = {
+  iceServers: [
+    {
+      urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
+    },
+  ],
+  iceCandidatePoolSize: 10,
+};
+
+
 export default function ConsultationPage({
   params,
 }: {
@@ -71,6 +82,7 @@ export default function ConsultationPage({
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -222,9 +234,10 @@ export default function ConsultationPage({
     // Clean up previous listeners
     hangUp();
 
-    peerConnectionRef.current = new RTCPeerConnection(undefined);
+    const peerConnection = new RTCPeerConnection(servers);
+    peerConnectionRef.current = peerConnection;
     
-    peerConnectionRef.current.ontrack = (event) => {
+    peerConnection.ontrack = (event) => {
         const newRemoteStream = event.streams[0];
         setRemoteStream(newRemoteStream);
     };
@@ -232,18 +245,13 @@ export default function ConsultationPage({
     if (!callDocRef) return;
     const callDoc = await getDoc(callDocRef);
     
-    const onIceCandidate = (candidate: RTCIceCandidate) => {
-        const candidatesCollection = collection(firestore, 'calls', callId, userRole === 'doctor' ? 'answerCandidates' : 'offerCandidates');
-        addDoc(candidatesCollection, candidate.toJSON());
-    }
-
+    let cleanup;
     if (callDoc.exists() && callDoc.data().offer && userRole === 'doctor') {
-      const cleanup = await joinCall(peerConnectionRef.current, firestore, callId, stream, onIceCandidate);
-      unsubscribeListenersRef.current.push(cleanup);
+      cleanup = await joinCall(peerConnection, firestore, callId, stream);
     } else {
-      const cleanup = await startCall(peerConnectionRef.current, firestore, callId, stream, onIceCandidate);
-      unsubscribeListenersRef.current.push(cleanup);
+      cleanup = await startCall(peerConnection, firestore, callId, stream);
     }
+    unsubscribeListenersRef.current.push(cleanup);
   };
 
   const hangUp = () => {
@@ -262,17 +270,16 @@ export default function ConsultationPage({
     localStream?.getTracks().forEach((track) => track.stop());
     setLocalStream(null);
     setRemoteStream(null);
-    setCallJoined(false);
-    setResetKey(prev => prev + 1); // Force remount of preview
-
-    // We don't hangUp() here to allow rejoining.
-    // Instead we just stop local tracks and navigate away.
-    // The call room remains in Firestore.
     
+    hangUp();
+    
+    setCallJoined(false);
+    setResetKey(prev => prev + 1);
+
     if (userRole === 'doctor') {
-      window.location.href = '/dashboard/staff';
+      router.push('/dashboard/staff');
     } else {
-      window.location.href = '/dashboard/consultations';
+      router.push('/dashboard/consultations');
     }
   };
 
@@ -555,7 +562,3 @@ export default function ConsultationPage({
     </div>
   );
 }
-
-    
-
-    

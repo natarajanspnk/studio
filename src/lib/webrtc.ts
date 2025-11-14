@@ -9,8 +9,6 @@ import {
   onSnapshot,
   setDoc,
   updateDoc,
-  Unsubscribe,
-  DocumentReference,
 } from 'firebase/firestore';
 
 const servers = {
@@ -22,32 +20,23 @@ const servers = {
   iceCandidatePoolSize: 10,
 };
 
-export const createPeerConnection = (
-  onTrack: (event: RTCTrackEvent) => void
-): RTCPeerConnection => {
-  const pc = new RTCPeerConnection(servers);
-  pc.ontrack = onTrack;
-  return pc;
-};
-
 export const startCall = async (
   peerConnection: RTCPeerConnection,
   firestore: Firestore,
   callId: string,
-  localStream: MediaStream,
-  onIceCandidate: (candidate: RTCIceCandidate) => void
+  localStream: MediaStream
 ): Promise<() => void> => {
-
   const callDocRef = doc(firestore, 'calls', callId);
+  const offerCandidatesCollection = collection(firestore, 'calls', callId, 'offerCandidates');
   const answerCandidatesCollection = collection(firestore, 'calls', callId, 'answerCandidates');
 
   localStream.getTracks().forEach((track) => {
     peerConnection.addTrack(track, localStream);
   });
-  
+
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      onIceCandidate(event.candidate);
+      addDoc(offerCandidatesCollection, event.candidate.toJSON());
     }
   };
 
@@ -88,13 +77,12 @@ export const joinCall = async (
   peerConnection: RTCPeerConnection,
   firestore: Firestore,
   callId: string,
-  localStream: MediaStream,
-  onIceCandidate: (candidate: RTCIceCandidate) => void
+  localStream: MediaStream
 ): Promise<() => void> => {
-
   const callDocRef = doc(firestore, 'calls', callId);
   const offerCandidatesCollection = collection(firestore, 'calls', callId, 'offerCandidates');
-  
+  const answerCandidatesCollection = collection(firestore, 'calls', callId, 'answerCandidates');
+
   const callDoc = await getDoc(callDocRef);
 
   if (!callDoc.exists()) {
@@ -104,10 +92,10 @@ export const joinCall = async (
   localStream.getTracks().forEach((track) => {
     peerConnection.addTrack(track, localStream);
   });
-  
+
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      onIceCandidate(event.candidate);
+      addDoc(answerCandidatesCollection, event.candidate.toJSON());
     }
   };
 
@@ -129,13 +117,15 @@ export const joinCall = async (
   const unsubscribeCandidates = onSnapshot(offerCandidatesCollection, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
-        let data = change.doc.data();
-        peerConnection.addIceCandidate(new RTCIceCandidate(data));
+        const candidate = new RTCIceCandidate(change.doc.data());
+        peerConnection.addIceCandidate(candidate);
       }
     });
   });
 
   return () => {
     unsubscribeCandidates();
-  }
+  };
 };
+
+    

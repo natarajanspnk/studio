@@ -30,7 +30,7 @@ export function ConsultationPreview({
   setIsMicOn,
   setIsCameraOn,
 }: ConsultationPreviewProps) {
-  const [hasPermission, setHasPermission] = useState(false);
+  const [hasPermission, setHasPermission] = useState(true); // Assume true initially
   const [isLoading, setIsLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -44,17 +44,15 @@ export function ConsultationPreview({
           video: true,
           audio: true,
         });
-        streamRef.current = stream;
+        streamRef.current = stream; 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
         setHasPermission(true);
         
-        // Ensure initial state from parent is respected, but only if stream is active
-        if (stream) {
-          stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
-          stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
-        }
+        // Apply initial mic/camera state that might have been set before permissions
+        stream.getAudioTracks().forEach(track => track.enabled = isMicOn);
+        stream.getVideoTracks().forEach(track => track.enabled = isCameraOn);
 
       } catch (error) {
         console.error('Error accessing media devices.', error);
@@ -73,8 +71,7 @@ export function ConsultationPreview({
     getMedia();
 
     return () => {
-      // This cleanup runs when the component unmounts.
-      // If the user navigates away from the preview without joining, stop the media tracks.
+      // Only stop the stream if it's still active and hasn't been passed to the parent.
       if (streamRef.current) {
          streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -104,10 +101,9 @@ export function ConsultationPreview({
 
   const handleJoin = () => {
     if (streamRef.current) {
-      // Pass the active stream to the parent component to use in the call
       onJoinCall(streamRef.current);
-      // Nullify the stream ref here so the cleanup function doesn't stop the tracks,
-      // as they are now being managed by the parent component.
+      // Nullify the ref so the cleanup function in this component instance
+      // doesn't stop the tracks, as they're now managed by the parent.
       streamRef.current = null;
     }
   };
@@ -118,30 +114,30 @@ export function ConsultationPreview({
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-muted">
             {isLoading && (
-              <div className="flex flex-col items-center gap-2">
+              <div className="absolute z-10 flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 animate-spin" />
                 <p>Starting camera...</p>
               </div>
             )}
             <video
               ref={videoRef}
-              className={`h-full w-full object-cover ${!isLoading && hasPermission ? 'block' : 'hidden'} -scale-x-100`}
+              className="h-full w-full -scale-x-100 object-cover"
               autoPlay
               muted
               playsInline
             />
-             {!isLoading && !hasPermission && (
+             {!hasPermission && !isLoading && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 p-4 text-center">
                  <Alert variant="destructive" className="max-w-sm border-0">
                   <VideoOff className="h-4 w-4" />
                    <AlertTitle>Camera & Mic Required</AlertTitle>
                    <AlertDescription>
-                     Please grant permission to use your camera and microphone to continue. You may need to refresh.
+                     Please grant permission to use your camera and microphone. You may need to refresh the page.
                    </AlertDescription>
                  </Alert>
                </div>
             )}
-            {!isLoading && hasPermission && !isCameraOn && (
+            {hasPermission && !isCameraOn && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 p-4">
                   <VideoOff className="h-16 w-16 text-white/70" />
                   <p className="mt-2 text-white/70">Your camera is off</p>
