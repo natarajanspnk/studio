@@ -9,7 +9,7 @@
 
 import {setGlobalOptions} from "firebase-functions";
 import {onRequest} from "firebase-functions/https";
-import {logger} from "firebase-functions/logger";
+import * as logger from "firebase-functions/logger";
 
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
@@ -26,7 +26,7 @@ import {logger} from "firebase-functions/logger";
 // this will be the maximum concurrent request count.
 setGlobalOptions({ maxInstances: 10 });
 
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+export const helloWorld = onRequest((request, response) => {
+   logger.info("Hello logs!", {structuredData: true});
+   response.send("Hello from Firebase!");
+});
