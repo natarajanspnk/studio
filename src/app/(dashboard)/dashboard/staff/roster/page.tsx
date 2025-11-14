@@ -55,6 +55,12 @@ import {
 import { collection, doc } from 'firebase/firestore';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { WithId } from '@/firebase/firestore/use-collection';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export type Doctor = {
   id: string;
@@ -93,12 +99,12 @@ export default function RosterPage() {
 
     // A user can only submit a form for themselves
     if (selectedDoctor && user?.uid !== selectedDoctor.id) {
-        toast({
-            variant: 'destructive',
-            title: 'Permission Denied',
-            description: 'You can only edit your own profile.',
-        });
-        return;
+      toast({
+        variant: 'destructive',
+        title: 'Permission Denied',
+        description: 'You can only edit your own profile.',
+      });
+      return;
     }
 
     const doctorId =
@@ -133,7 +139,7 @@ export default function RosterPage() {
 
   const handleDeleteDoctor = () => {
     if (!firestore || !selectedDoctor) return;
-    
+
     if (user?.uid !== selectedDoctor.id) {
       toast({
         variant: 'destructive',
@@ -143,7 +149,6 @@ export default function RosterPage() {
       setDeleteConfirmOpen(false);
       return;
     }
-
 
     const doctorRef = doc(firestore, 'doctors', selectedDoctor.id);
     deleteDocumentNonBlocking(doctorRef);
@@ -161,6 +166,50 @@ export default function RosterPage() {
     setSelectedDoctor(null);
     setDialogOpen(true);
   };
+  
+  const ActionMenuItem = ({
+    doctor,
+    action,
+   }: {
+    doctor: WithId<Doctor>;
+    action: 'edit' | 'delete';
+   }) => {
+    const isOwner = user?.uid === doctor.id;
+  
+    const content =
+      action === 'edit' ? (
+        <DropdownMenuItem
+          onSelect={(e) => e.preventDefault()}
+          onClick={() => openEditDialog(doctor)}
+          disabled={!isOwner}
+        >
+          Edit
+        </DropdownMenuItem>
+      ) : (
+        <DropdownMenuItem
+          onSelect={(e) => e.preventDefault()}
+          className="text-destructive"
+          onClick={() => openDeleteDialog(doctor)}
+          disabled={!isOwner}
+        >
+          Delete
+        </DropdownMenuItem>
+      );
+  
+    if (isOwner) {
+      return content;
+    }
+  
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{content}</TooltipTrigger>
+        <TooltipContent side="left">
+          <p>You can only manage your own profile.</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+   };
+
 
   return (
     <Dialog
@@ -241,19 +290,8 @@ export default function RosterPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem
-                              onClick={() => openEditDialog(doctor)}
-                              disabled={user?.uid !== doctor.id}
-                            >
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => openDeleteDialog(doctor)}
-                              disabled={user?.uid !== doctor.id}
-                            >
-                              Delete
-                            </DropdownMenuItem>
+                              <ActionMenuItem doctor={doctor} action="edit" />
+                              <ActionMenuItem doctor={doctor} action="delete" />
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
