@@ -24,7 +24,7 @@ const features = [
   },
   {
     icon: <Video className="h-8 w-8 text-primary" />,
-    title: 'Real-time Video Hello',
+    title: 'Real-time Video  a',
     description:
       'Connect with doctors face-to-face through high-quality, real-time video calls from anywhere.',
   },
