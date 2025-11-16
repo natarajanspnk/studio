@@ -1,11 +1,9 @@
-<<<<<<< HEAD
 
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useMemo, useState } from 'react';
-=======
-export const dynamic = 'force-dynamic';
->>>>>>> 27d78fbec6a9a368e758e2e291c1cd07cd589b59
+
 import {
   Table,
   TableBody,
