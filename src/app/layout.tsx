@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next" //for Vercel WEB Analytics
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -5,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Poppins, Inter } from 'next/font/google';
-import { Analytics } from "@vercel/analytics/next" //for Vercel WEB Analytics
+
 
 export const metadata: Metadata = {
   title: 'MedConnect: Your Health, Connected.',
@@ -46,6 +47,7 @@ export default function RootLayout({
           <FirebaseClientProvider>{children}</FirebaseClientProvider>
           <Toaster />
         </ThemeProvider>
+        <Analytics/>
       </body>
     </html>
   );
