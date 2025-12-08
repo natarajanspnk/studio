@@ -72,7 +72,7 @@ const servers = {
 };
 
 
-export default function ConsultationPage({
+export default function ConsultationClient({
   callId,
 }: {
   callId: string;
