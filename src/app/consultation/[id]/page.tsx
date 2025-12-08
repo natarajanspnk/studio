@@ -1,39 +1,35 @@
-// app/consultation/[id]/page.js
+// server component dont change
 
-// 💡 FIX: Import the necessary Firebase functions for use during build time.
-import { collection, getDocs } from 'firebase/firestore';
-
-// 🔑 CRITICAL: You must import your initialized client-side Firestore instance here.
-// You used `useFirestore()` in the client component, so you need the underlying export.
-// REPLACE '@/firebase/clientApp' with the actual path to your initialized client Firestore object.
-import { useFirestore as db } from '@/firebase'; // 🚨 Assuming your client Firestore instance is exported as `firestore` from '@/firebase'
+// 1. Imports for static generation (uses the client SDK to fetch data at build time)
+import { collection, getDocs } from 'firebase/firestore'; 
+import { firestore } from '@/firebase'; // 🔑 ASSUMPTION: Replace this with your actual Firestore initialization import path and name.
 
 // Import the Client Component
 import ConsultationClient from './client'; 
 
-// This function runs on the server at BUILD TIME
+// This function fixes the build error by telling Next.js which paths to pre-render.
 export async function generateStaticParams() {
-  
-  // Use the imported Firestore instance (`db`)
-  const callsCollectionRef = collection(db, 'calls');
+  // Queries the top-level 'calls' collection for all existing IDs.
+  const callsCollectionRef = collection(firestore, 'calls');
   const snapshot = await getDocs(callsCollectionRef);
 
-  // Return the array of { id: value } objects
+  // Returns the array of { id: value } objects required by Next.js
   return snapshot.docs.map((doc) => ({
-    id: doc.id, // The document ID is the callId
+    id: doc.id, 
   }));
 }
 
-// This is the Server Component that renders the Client Component
-export default function ConsultationPage({
-  params,
-}: {
-  params: { id: string };
+// This is the Server Component wrapper
+export default function ConsultationPage({ 
+    params, 
+}: { 
+    params: { id: string }; 
 }) {
-  const callId = params.id; // Get ID directly from params
+    // Extracts the ID from the URL parameters
+    const callId = params.id; 
 
-  // Pass the ID to the Client Component
-  return (
-    <ConsultationClient callId={callId} />
-  );
+    // Renders the Client Component, passing the URL ID as a prop
+    return (
+        <ConsultationClient callId={callId} /> 
+    );
 }

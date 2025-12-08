@@ -73,11 +73,10 @@ const servers = {
 
 
 export default function ConsultationPage({
-  params,
+  callId,
 }: {
-  params: { id: string };
+  callId: string;
 }) {
-  const { id: callId } = use(params);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
