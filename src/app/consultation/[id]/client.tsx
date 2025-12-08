@@ -296,7 +296,7 @@ export default function ConsultationPage({
   const messagesCollectionRef = useMemoFirebase(
     () =>
       firestore && callId
-        ? collection(firestore, 'calls', callId, 'messages')
+        ? collection(doc(firestore, 'calls', callId), 'messages')
         : null,
     [firestore, callId]
   );

@@ -48,3 +48,8 @@ export * from './non-blocking-updates';
 export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';
+
+const { firestore } = initializeFirebase();
+
+// Use a simple named export for the initialized database object
+export { firestore };
